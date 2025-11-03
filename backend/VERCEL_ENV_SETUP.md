@@ -25,8 +25,9 @@ GOOGLE_AUTH_URI=https://accounts.google.com/o/oauth2/auth
 
 ### 2. Google OAuth Refresh Token (ONE token for both YouTube & Sheets)
 ```
-GOOGLE_REFRESH_TOKEN=1//05KpF1q7hEkGICgYIARAAGAUSNwF-L9IrGvFYjHTSfXgfNDp_dRyoOwDY-7LYbodfy7M-hkfpa4kN7BBQaM35EH2qxWDMvEwRjws
+GOOGLE_REFRESH_TOKEN=your_refresh_token_here
 ```
+**Value:** Use the refresh token you received from the OAuth flow (starts with `1//...`)
 
 **⚠️ Important:** This ONE refresh token works for:
 - ✅ YouTube API (read & upload)
