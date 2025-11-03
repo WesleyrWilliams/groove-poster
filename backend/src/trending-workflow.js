@@ -200,38 +200,86 @@ export async function saveToGoogleSheets(videos) {
       'Selected'
     ]);
     
+    // First, try to create the sheet if it doesn't exist
+    try {
+      // Try to read the sheet to check if it exists
+      await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: 'Trending Videos!A1'
+      });
+    } catch (error) {
+      // Sheet doesn't exist, create it
+      console.log('📝 Creating "Trending Videos" tab...');
+      try {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            requests: [{
+              addSheet: {
+                properties: {
+                  title: 'Trending Videos'
+                }
+              }
+            }]
+          }
+        });
+        console.log('✅ Created "Trending Videos" tab');
+      } catch (createError) {
+        console.error('Error creating sheet tab:', createError.message);
+      }
+    }
+    
     // Clear existing data and add headers + new data
     const range = 'Trending Videos!A1:K1000';
     
-    // First, clear the sheet
-    await sheets.spreadsheets.values.clear({
-      spreadsheetId,
-      range
-    });
+    try {
+      // First, clear the sheet
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId,
+        range
+      });
+      
+      console.log('✅ Cleared existing data');
+    } catch (clearError) {
+      console.warn('⚠️ Could not clear sheet (might be empty):', clearError.message);
+    }
     
     // Add headers
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: 'Trending Videos!A1:K1',
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: [headers]
-      }
-    });
+    try {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: 'Trending Videos!A1:K1',
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [headers]
+        }
+      });
+      console.log('✅ Added headers');
+    } catch (headerError) {
+      console.error('❌ Error adding headers:', headerError.message);
+      throw headerError;
+    }
     
     // Add data
     if (rows.length > 0) {
-      await sheets.spreadsheets.values.append({
-        spreadsheetId,
-        range: 'Trending Videos!A2:K',
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: rows
-        }
-      });
+      try {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId,
+          range: 'Trending Videos!A2:K',
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: rows
+          }
+        });
+        console.log(`✅ Saved ${rows.length} videos to Google Sheets`);
+      } catch (dataError) {
+        console.error('❌ Error saving data:', dataError.message);
+        console.error('Error details:', dataError.response?.data || dataError);
+        throw dataError;
+      }
+    } else {
+      console.warn('⚠️ No rows to save');
     }
-    
-    console.log(`✅ Saved ${rows.length} videos to Google Sheets`);
   } catch (error) {
     console.error('Error saving to Google Sheets:', error.message);
     // Don't throw - allow workflow to continue
@@ -431,7 +479,13 @@ export async function runTrendingWorkflow(options = {}) {
     });
     
     // Step 4: Save to Google Sheets
-    await saveToGoogleSheets(topVideos);
+    try {
+      await saveToGoogleSheets(topVideos);
+      console.log('\n✅ Google Sheets update completed');
+    } catch (error) {
+      console.error('\n❌ Google Sheets update failed:', error.message);
+      console.error('Workflow continues, but data not saved to sheet');
+    }
     
     // Step 5: Extract best clip from top video
     if (options.extractClip && topVideos.length > 0) {
