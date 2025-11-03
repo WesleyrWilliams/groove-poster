@@ -82,7 +82,7 @@ If you see an error:
 
 ### Step 3: Check Your Google Sheet
 
-1. Open your sheet: https://docs.google.com/spreadsheets/d/1U-vA2-4nHS1FsaMcjZjKCr1H8WPqTnVBeCKTEdTr_HM/edit
+1. Open your sheet: https://docs.google.com/spreadsheets/d/1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ/edit
 2. Go to **"Trending Videos"** tab
 3. You should see:
 
@@ -197,7 +197,7 @@ Copy and paste this in your terminal:
 curl -X POST https://groove-poster-backend.vercel.app/api/trending-workflow \
   -H "Content-Type: application/json" \
   -d '{"maxResults": 5, "topCount": 3}' && \
-echo "\n\n✅ Check your Google Sheet: https://docs.google.com/spreadsheets/d/1U-vA2-4nHS1FsaMcjZjKCr1H8WPqTnVBeCKTEdTr_HM/edit\n"
+echo "\n\n✅ Check your Google Sheet: https://docs.google.com/spreadsheets/d/1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ/edit\n"
 ```
 
 Then:

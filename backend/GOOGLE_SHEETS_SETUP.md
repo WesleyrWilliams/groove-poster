@@ -2,9 +2,9 @@
 
 ## ✅ Your Google Sheet
 
-**Sheet URL**: https://docs.google.com/spreadsheets/d/1U-vA2-4nHS1FsaMcjZjKCr1H8WPqTnVBeCKTEdTr_HM/edit
+**Sheet URL**: https://docs.google.com/spreadsheets/d/1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ/edit
 
-**Spreadsheet ID**: `1U-vA2-4nHS1FsaMcjZjKCr1H8WPqTnVBeCKTEdTr_HM`
+**Spreadsheet ID**: `1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ`
 
 ---
 
@@ -12,7 +12,7 @@
 
 ### Step 1: Verify Sheet Tab Name
 
-1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/1U-vA2-4nHS1FsaMcjZjKCr1H8WPqTnVBeCKTEdTr_HM/edit
+1. Open your Google Sheet: https://docs.google.com/spreadsheets/d/1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ/edit
 2. Check if you have a tab named: **"Trending Videos"**
 3. If not, create it:
    - Click the "+" button at the bottom
@@ -32,7 +32,7 @@
 3. **Add New Variable:**
    - Click **"Add New"** button
    - **Variable Name**: `GOOGLE_SHEET_ID`
-   - **Value**: `1U-vA2-4nHS1FsaMcjZjKCr1H8WPqTnVBeCKTEdTr_HM`
+   - **Value**: `1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ`
    - **Environment**: Select all (Production, Preview, Development)
    - Click **Save**
 
@@ -107,7 +107,7 @@ Once `GOOGLE_SHEET_ID` is added to Vercel:
 
 - [ ] Verified "Trending Videos" tab exists in your sheet
 - [ ] Added `GOOGLE_SHEET_ID` to Vercel environment variables
-- [ ] Value: `1U-vA2-4nHS1FsaMcjZjKCr1H8WPqTnVBeCKTEdTr_HM`
+- [ ] Value: `1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ`
 - [ ] Selected all environments (Production, Preview, Development)
 - [ ] Redeployed backend
 - [ ] Tested workflow (should save to sheet)

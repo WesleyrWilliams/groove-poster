@@ -2,9 +2,9 @@
 
 ## 📋 Your Sheet Details
 
-**Spreadsheet ID**: `1U-vA2-4nHS1FsaMcjZjKCr1H8WPqTnVBeCKTEdTr_HM`
+**Spreadsheet ID**: `1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ`
 
-**Sheet URL**: https://docs.google.com/spreadsheets/d/1U-vA2-4nHS1FsaMcjZjKCr1H8WPqTnVBeCKTEdTr_HM/edit
+**Sheet URL**: https://docs.google.com/spreadsheets/d/1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ/edit
 
 ---
 
@@ -12,7 +12,7 @@
 
 ### Step 1: Verify Sheet Tab (30 seconds)
 
-1. Open your sheet: https://docs.google.com/spreadsheets/d/1U-vA2-4nHS1FsaMcjZjKCr1H8WPqTnVBeCKTEdTr_HM/edit
+1. Open your sheet: https://docs.google.com/spreadsheets/d/1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ/edit
 2. Check bottom tabs - do you see **"Trending Videos"**?
 3. If not:
    - Click **"+"** button
@@ -27,7 +27,7 @@
 5. Fill in:
    ```
    Name: GOOGLE_SHEET_ID
-   Value: 1U-vA2-4nHS1FsaMcjZjKCr1H8WPqTnVBeCKTEdTr_HM
+   Value: 1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ
    Environment: All (Production, Preview, Development)
    ```
 6. Click **Save**
