@@ -62,7 +62,9 @@ function calculateTrendScore(video) {
  */
 export async function fetchTrendingVideos(maxResults = 20) {
   try {
-    console.log('🔍 Fetching trending videos...');
+    console.log('\n═══════════════════════════════════════════════════════════');
+    console.log('🔍 STEP 1: FETCHING TRENDING VIDEOS');
+    console.log('═══════════════════════════════════════════════════════════\n');
     
     const trendingVideos = [];
     
@@ -77,12 +79,25 @@ export async function fetchTrendingVideos(maxResults = 20) {
       'challenge'
     ];
     
+    console.log(`📊 Searching ${searchQueries.slice(0, 5).length} queries...\n`);
+    
     for (const query of searchQueries.slice(0, 5)) { // Limit to avoid rate limits
       try {
+        console.log(`   🔎 Searching: "${query}"...`);
         const videos = await searchTrendingVideos(query, Math.ceil(maxResults / searchQueries.length));
+        console.log(`   ✅ Found ${videos.length} videos for "${query}"`);
+        
+        // Log each video found
+        videos.forEach((v, i) => {
+          console.log(`      ${i + 1}. ${v.title || 'Untitled'}`);
+          console.log(`         Channel: ${v.channelTitle || 'Unknown'}`);
+          console.log(`         Video ID: ${v.videoId}`);
+          console.log(`         URL: https://youtube.com/watch?v=${v.videoId}\n`);
+        });
+        
         trendingVideos.push(...videos);
       } catch (error) {
-        console.error(`Error searching "${query}":`, error.message);
+        console.error(`   ❌ Error searching "${query}":`, error.message);
       }
     }
     
@@ -91,10 +106,12 @@ export async function fetchTrendingVideos(maxResults = 20) {
       new Map(trendingVideos.map(v => [v.videoId, v])).values()
     );
     
-    console.log(`✅ Found ${uniqueVideos.length} unique trending videos`);
+    console.log(`\n✅ TOTAL: Found ${uniqueVideos.length} unique trending videos`);
+    console.log(`📊 Limiting to top ${maxResults} videos\n`);
+    
     return uniqueVideos.slice(0, maxResults);
   } catch (error) {
-    console.error('Error fetching trending videos:', error);
+    console.error('❌ Error fetching trending videos:', error);
     throw error;
   }
 }
@@ -103,15 +120,39 @@ export async function fetchTrendingVideos(maxResults = 20) {
  * Analyze and rank videos by trend score
  */
 export async function analyzeAndRankVideos(videos) {
-  console.log('📊 Analyzing and ranking videos...');
+  console.log('\n═══════════════════════════════════════════════════════════');
+  console.log('📊 STEP 2: ANALYZING & RANKING VIDEOS');
+  console.log('═══════════════════════════════════════════════════════════\n');
   
   const analyzedVideos = [];
   
-  for (const video of videos) {
+  console.log(`📈 Analyzing ${videos.length} videos for trend score...\n`);
+  
+  for (let i = 0; i < videos.length; i++) {
+    const video = videos[i];
     try {
+      console.log(`\n   [${i + 1}/${videos.length}] Analyzing: ${video.title || video.videoId}`);
+      console.log(`   🔗 URL: https://youtube.com/watch?v=${video.videoId}`);
+      
       // Get detailed video stats
+      console.log(`   📊 Fetching video details...`);
       const details = await getVideoDetails(video.videoId);
+      
+      console.log(`   ✅ Video Details Retrieved:`);
+      console.log(`      Title: ${details.title}`);
+      console.log(`      Channel: ${details.channelTitle || 'Unknown'}`);
+      console.log(`      Views: ${parseInt(details.viewCount || 0).toLocaleString()}`);
+      console.log(`      Likes: ${parseInt(details.likeCount || 0).toLocaleString()}`);
+      console.log(`      Published: ${details.publishedAt || 'Unknown'}`);
+      
       const trendData = calculateTrendScore(details);
+      
+      console.log(`   📈 Trend Score Calculation:`);
+      console.log(`      Views/Hour: ${trendData.viewsPerHour.toLocaleString()}`);
+      console.log(`      Like Ratio: ${trendData.likeRatio}%`);
+      console.log(`      Hours Since Published: ${trendData.recencyHours}`);
+      console.log(`      Channel Bonus: ${trendData.channelBonus}`);
+      console.log(`      🎯 FINAL TREND SCORE: ${trendData.score}`);
       
       // Determine reason for selection
       let reason = '';
@@ -124,8 +165,10 @@ export async function analyzeAndRankVideos(videos) {
       } else if (trendData.channelBonus > 1) {
         reason = `Popular creator content`;
       } else {
-        reason = `Trending content with ${details.viewCount} views`;
+        reason = `Trending content with ${parseInt(details.viewCount || 0).toLocaleString()} views`;
       }
+      
+      console.log(`   🎯 Reason: ${reason}`);
       
       analyzedVideos.push({
         ...details,
@@ -135,15 +178,24 @@ export async function analyzeAndRankVideos(videos) {
         reason,
         channelName: details.channelTitle || video.channelTitle || 'Unknown'
       });
+      
+      console.log(`   ✅ Analysis complete\n`);
     } catch (error) {
-      console.error(`Error analyzing video ${video.videoId}:`, error.message);
+      console.error(`   ❌ Error analyzing video ${video.videoId}:`, error.message);
     }
   }
   
   // Sort by trend score (highest first)
   analyzedVideos.sort((a, b) => b.trendScore - a.trendScore);
   
-  console.log(`✅ Ranked ${analyzedVideos.length} videos`);
+  console.log(`\n✅ RANKING COMPLETE: Ranked ${analyzedVideos.length} videos\n`);
+  console.log('📊 TOP RANKED VIDEOS:');
+  analyzedVideos.slice(0, 5).forEach((v, i) => {
+    console.log(`   ${i + 1}. ${v.title}`);
+    console.log(`      Score: ${v.trendScore} | Views: ${parseInt(v.viewCount || 0).toLocaleString()} | ${v.reason}`);
+  });
+  console.log('');
+  
   return analyzedVideos;
 }
 
@@ -159,7 +211,12 @@ export async function saveToGoogleSheets(videos) {
       return;
     }
     
-    console.log('📊 Saving to Google Sheets...');
+    console.log('\n═══════════════════════════════════════════════════════════');
+    console.log('📊 STEP 3: SAVING TO GOOGLE SHEETS');
+    console.log('═══════════════════════════════════════════════════════════\n');
+    
+    console.log(`📋 Sheet ID: ${spreadsheetId}`);
+    console.log(`📊 Preparing to save ${videos.length} videos...\n`);
     
     // Get access token using OAuth
     const accessToken = await getAccessToken();
@@ -186,19 +243,26 @@ export async function saveToGoogleSheets(videos) {
     ];
     
     // Prepare data rows
-    const rows = videos.map(video => [
-      video.channelName || '',
-      video.title || '',
-      video.url || '',
-      video.trendScore || 0,
-      video.reason || '',
-      video.viewCount || 0,
-      video.likeCount || 0,
-      video.trendData?.viewsPerHour || 0,
-      video.trendData?.likeRatio || 0,
-      video.publishedAt || '',
-      'Selected'
-    ]);
+    console.log('📝 Preparing data rows...');
+    const rows = videos.map((video, i) => {
+      console.log(`   [${i + 1}/${videos.length}] ${video.title}`);
+      console.log(`      Channel: ${video.channelName}`);
+      console.log(`      Score: ${video.trendScore} | Views: ${parseInt(video.viewCount || 0).toLocaleString()}`);
+      return [
+        video.channelName || '',
+        video.title || '',
+        video.url || '',
+        video.trendScore || 0,
+        video.reason || '',
+        video.viewCount || 0,
+        video.likeCount || 0,
+        video.trendData?.viewsPerHour || 0,
+        video.trendData?.likeRatio || 0,
+        video.publishedAt || '',
+        'Selected'
+      ];
+    });
+    console.log('');
     
     // First, try to create the sheet if it doesn't exist
     try {
@@ -280,8 +344,9 @@ export async function saveToGoogleSheets(videos) {
     } else {
       console.warn('⚠️ No rows to save');
     }
-    console.log(`✅ Saved ${rows.length} videos to Google Sheets`);
+    console.log(`\n✅ SUCCESS: Saved ${rows.length} videos to Google Sheets`);
     console.log(`📊 Sheet URL: https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`);
+    console.log(`📋 Tab: "Trending Videos"\n`);
   } catch (error) {
     console.error('❌ Error saving to Google Sheets:', error.message);
     console.error('Error details:', error.response?.data || error);
@@ -479,7 +544,15 @@ export async function uploadToYouTubeShorts(clipData) {
  */
 export async function runTrendingWorkflow(options = {}) {
   try {
-    console.log('\n🚀 Starting Trending Workflow...\n');
+    console.log('\n\n');
+    console.log('╔═══════════════════════════════════════════════════════════╗');
+    console.log('║   🚀 TRENDING WORKFLOW STARTED                          ║');
+    console.log('╚═══════════════════════════════════════════════════════════╝');
+    console.log(`\n📋 Configuration:`);
+    console.log(`   Max Results: ${options.maxResults || 20}`);
+    console.log(`   Top Count: ${options.topCount || 5}`);
+    console.log(`   Extract Clip: ${options.extractClip ? 'Yes' : 'No'}`);
+    console.log(`   Upload to YouTube: ${options.uploadToYouTube ? 'Yes' : 'No'}\n`);
     
     // Step 1: Fetch trending videos
     const videos = await fetchTrendingVideos(options.maxResults || 20);
@@ -489,18 +562,27 @@ export async function runTrendingWorkflow(options = {}) {
     
     // Step 3: Select top videos
     const topVideos = rankedVideos.slice(0, options.topCount || 5);
-    console.log(`\n🎯 Selected top ${topVideos.length} videos:\n`);
+    
+    console.log('\n═══════════════════════════════════════════════════════════');
+    console.log(`🎯 STEP 4: SELECTING TOP ${topVideos.length} VIDEOS`);
+    console.log('═══════════════════════════════════════════════════════════\n');
     
     topVideos.forEach((v, i) => {
-      console.log(`${i + 1}. ${v.title}`);
-      console.log(`   Score: ${v.trendScore} | ${v.reason}`);
-      console.log(`   Views: ${v.viewCount} | Link: ${v.url}\n`);
+      console.log(`\n   ${i + 1}. ${v.title}`);
+      console.log(`      Channel: ${v.channelName}`);
+      console.log(`      🎯 Trend Score: ${v.trendScore}`);
+      console.log(`      📊 Views: ${parseInt(v.viewCount || 0).toLocaleString()}`);
+      console.log(`      👍 Likes: ${parseInt(v.likeCount || 0).toLocaleString()}`);
+      console.log(`      📈 Views/Hour: ${v.trendData?.viewsPerHour || 0}`);
+      console.log(`      💚 Like Ratio: ${v.trendData?.likeRatio || 0}%`);
+      console.log(`      ⏰ Published: ${v.publishedAt || 'Unknown'}`);
+      console.log(`      🎯 Reason: ${v.reason}`);
+      console.log(`      🔗 Link: ${v.url}\n`);
     });
     
     // Step 4: Save to Google Sheets
     try {
       await saveToGoogleSheets(topVideos);
-      console.log('\n✅ Google Sheets update completed');
     } catch (error) {
       console.error('\n❌ Google Sheets update failed:', error.message);
       console.error('Workflow continues, but data not saved to sheet');
@@ -509,17 +591,45 @@ export async function runTrendingWorkflow(options = {}) {
     // Step 5: Extract best clip from top video
     if (options.extractClip && topVideos.length > 0) {
       const topVideo = topVideos[0];
-      console.log(`\n🎬 Processing top video: ${topVideo.title}`);
+      
+      console.log('\n═══════════════════════════════════════════════════════════');
+      console.log('🎬 STEP 5: EXTRACTING BEST CLIP');
+      console.log('═══════════════════════════════════════════════════════════\n');
+      console.log(`📹 Processing top video: ${topVideo.title}`);
+      console.log(`   Video ID: ${topVideo.videoId}`);
+      console.log(`   URL: ${topVideo.url}\n`);
       
       const clip = await extractBestClip(topVideo.videoId);
-      console.log(`✅ Best clip: ${clip.startTime}s - ${clip.endTime}s`);
-      console.log(`   Reason: ${clip.reason}`);
-      console.log(`   Caption: ${clip.caption}\n`);
+      
+      console.log(`\n✅ BEST CLIP EXTRACTED:`);
+      console.log(`   Start Time: ${clip.startTime}s`);
+      console.log(`   End Time: ${clip.endTime}s`);
+      console.log(`   Duration: ${clip.duration}s`);
+      console.log(`   🎯 Reason: ${clip.reason}`);
+      console.log(`   📝 Caption: ${clip.caption}`);
+      console.log(`   📄 Text: ${clip.text?.substring(0, 100)}...\n`);
       
       // Step 6: Upload to YouTube Shorts (if enabled)
       if (options.uploadToYouTube) {
+        console.log('\n═══════════════════════════════════════════════════════════');
+        console.log('📤 STEP 6: UPLOADING TO YOUTUBE SHORTS');
+        console.log('═══════════════════════════════════════════════════════════\n');
         await uploadToYouTubeShorts(clip);
       }
+      
+      console.log('\n');
+      console.log('╔═══════════════════════════════════════════════════════════╗');
+      console.log('║   ✅ TRENDING WORKFLOW COMPLETED SUCCESSFULLY              ║');
+      console.log('╚═══════════════════════════════════════════════════════════╝');
+      console.log(`\n📊 Summary:`);
+      console.log(`   ✅ Processed ${videos.length} videos`);
+      console.log(`   ✅ Selected top ${topVideos.length} videos`);
+      console.log(`   ✅ Saved to Google Sheets`);
+      console.log(`   ✅ Extracted best clip: ${clip.startTime}s - ${clip.endTime}s`);
+      if (options.uploadToYouTube) {
+        console.log(`   ✅ Uploaded to YouTube Shorts`);
+      }
+      console.log('');
       
       return {
         success: true,
@@ -529,13 +639,25 @@ export async function runTrendingWorkflow(options = {}) {
       };
     }
     
+    console.log('\n');
+    console.log('╔═══════════════════════════════════════════════════════════╗');
+    console.log('║   ✅ TRENDING WORKFLOW COMPLETED SUCCESSFULLY              ║');
+    console.log('╚═══════════════════════════════════════════════════════════╝');
+    console.log(`\n📊 Summary:`);
+    console.log(`   ✅ Processed ${videos.length} videos`);
+    console.log(`   ✅ Selected top ${topVideos.length} videos`);
+    console.log(`   ✅ Saved to Google Sheets`);
+    console.log(`   ⏭️  Clip extraction skipped`);
+    console.log('');
+    
     return {
       success: true,
       videos: topVideos,
       message: 'Trending workflow completed (clip extraction skipped)'
     };
   } catch (error) {
-    console.error('Error in trending workflow:', error);
+    console.error('\n❌ ERROR IN TRENDING WORKFLOW:', error);
+    console.error('Stack trace:', error.stack);
     throw error;
   }
 }
