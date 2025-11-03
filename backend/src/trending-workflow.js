@@ -280,8 +280,27 @@ export async function saveToGoogleSheets(videos) {
     } else {
       console.warn('⚠️ No rows to save');
     }
+    console.log(`✅ Saved ${rows.length} videos to Google Sheets`);
+    console.log(`📊 Sheet URL: https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`);
   } catch (error) {
-    console.error('Error saving to Google Sheets:', error.message);
+    console.error('❌ Error saving to Google Sheets:', error.message);
+    console.error('Error details:', error.response?.data || error);
+    
+    // Check specific error types
+    if (!spreadsheetId) {
+      console.error('⚠️ GOOGLE_SHEET_ID environment variable not set in Vercel!');
+      console.error('⚠️ Add GOOGLE_SHEET_ID=1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ to Vercel environment variables');
+    }
+    if (error.message?.includes('permission') || error.response?.status === 403) {
+      console.error('⚠️ Permission denied - check OAuth scopes include spreadsheets');
+      console.error('⚠️ Make sure you authorized with spreadsheets scope');
+    }
+    if (error.message?.includes('not found') || error.response?.status === 404) {
+      console.error('⚠️ Sheet not found - check GOOGLE_SHEET_ID is correct');
+      console.error(`⚠️ Current ID: ${spreadsheetId}`);
+      console.error('⚠️ Expected ID: 1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ');
+    }
+    
     // Don't throw - allow workflow to continue
   }
 }

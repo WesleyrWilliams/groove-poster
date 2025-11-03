@@ -29,6 +29,7 @@ app.get('/', (req, res) => {
       oauth2: '/oauth2 (one-time setup)',
       oauth2Callback: '/oauth2callback',
       oauth2Test: '/oauth2/test (test auto-connection)',
+      sheetsCheck: '/api/sheets/check (check Google Sheets config)',
       trendingWorkflow: '/api/trending-workflow (run full trending flow)'
     }
   });
@@ -341,6 +342,29 @@ app.get('/oauth2callback', async (req, res) => {
       error: 'OAuth callback failed', 
       message: error.message 
     });
+  }
+});
+
+// Check Google Sheets configuration
+app.get('/api/sheets/check', async (req, res) => {
+  try {
+    const sheetId = process.env.GOOGLE_SHEET_ID;
+    const hasRefreshToken = !!process.env.GOOGLE_REFRESH_TOKEN;
+    
+    return res.json({
+      configured: !!sheetId,
+      sheetId: sheetId || 'NOT SET',
+      expectedSheetId: '1wkkQa2SFHRpvZS8HJ9j3BVTIbnAWA0xKA_Gwysch2WQ',
+      oauthConnected: hasRefreshToken,
+      instructions: sheetId 
+        ? '✅ GOOGLE_SHEET_ID is set. Check Vercel logs for errors.'
+        : '⚠️ Add GOOGLE_SHEET_ID to Vercel environment variables',
+      sheetUrl: sheetId 
+        ? `https://docs.google.com/spreadsheets/d/${sheetId}/edit`
+        : null
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
