@@ -154,9 +154,11 @@ async function testVideoClipping() {
           endTime,
           duration,
           videoPath: result.videoPath,
-          title: analysis.title,
-          subtitle: analysis.subtitle,
-          reason: clip.reason
+          title: analysis.title || `Clip ${clipNumber}: ${clip.reason || 'Viral Moment'}`,
+          subtitle: analysis.subtitle || '',
+          reason: clip.reason,
+          hashtags: analysis.hashtags || ['#viral', '#shorts', '#trending'],
+          cleanup: result.cleanup
         });
         
       } catch (error) {
@@ -182,10 +184,62 @@ async function testVideoClipping() {
     
     console.log('🎉 All clips processed with 9:16 layout and logo watermark!\n');
     
+    // Step 5: Upload to YouTube (if enabled)
+    const uploadToYouTube = process.env.UPLOAD_TO_YOUTUBE === 'true' || process.argv.includes('--upload');
+    
+    if (uploadToYouTube && processedClips.length > 0) {
+      console.log('\n═══════════════════════════════════════════════════════════');
+      console.log('📤 STEP 5: UPLOADING CLIPS TO YOUTUBE SHORTS');
+      console.log('═══════════════════════════════════════════════════════════\n');
+      
+      const { uploadToYouTubeShorts } = await import('./src/trending-workflow.js');
+      
+      for (let i = 0; i < processedClips.length; i++) {
+        const clip = processedClips[i];
+        console.log(`\n📤 Uploading clip ${clip.clipNumber}/${processedClips.length}...`);
+        console.log(`   Title: ${clip.title}`);
+        console.log(`   Path: ${clip.videoPath}\n`);
+        
+        try {
+          const uploadResult = await uploadToYouTubeShorts({
+            videoPath: clip.videoPath,
+            title: clip.title,
+            subtitle: clip.subtitle,
+            reason: clip.reason,
+            hashtags: clip.hashtags
+          });
+          
+          console.log(`   ✅ Clip ${clip.clipNumber} uploaded successfully!`);
+          console.log(`   Video ID: ${uploadResult.videoId}`);
+          console.log(`   URL: ${uploadResult.videoUrl}\n`);
+          
+          processedClips[i].uploaded = true;
+          processedClips[i].youtubeVideoId = uploadResult.videoId;
+          processedClips[i].youtubeVideoUrl = uploadResult.videoUrl;
+          
+          // Cleanup after successful upload
+          if (clip.cleanup) {
+            clip.cleanup();
+          }
+        } catch (uploadError) {
+          console.error(`   ❌ Error uploading clip ${clip.clipNumber}:`, uploadError.message);
+          processedClips[i].uploaded = false;
+          processedClips[i].uploadError = uploadError.message;
+        }
+      }
+      
+      const uploadedCount = processedClips.filter(c => c.uploaded).length;
+      console.log(`\n✅ Upload Summary: ${uploadedCount}/${processedClips.length} clips uploaded successfully\n`);
+    } else {
+      console.log('\n📝 Note: Upload to YouTube is disabled.');
+      console.log('   To enable upload, set UPLOAD_TO_YOUTUBE=true or use --upload flag\n');
+    }
+    
     return {
       success: true,
       totalClips: clipsToProcess.length,
       processedClips: processedClips.length,
+      uploadedClips: processedClips.filter(c => c.uploaded).length,
       clips: processedClips
     };
     
