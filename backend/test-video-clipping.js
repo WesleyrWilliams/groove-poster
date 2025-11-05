@@ -3,6 +3,9 @@
  * Tests the enhanced 9:16 video processor with logo watermark
  */
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { processVideoToShort } from './src/video-processor-enhanced.js';
 import { getVideoDetails } from './src/youtube-fetcher.js';
 import { getTranscript } from './src/transcript-api.js';
@@ -36,25 +39,71 @@ async function testVideoClipping() {
     
     // Step 2: Get transcript
     console.log('📝 Step 2: Fetching transcript...');
-    const transcript = await getTranscript(videoId);
+    let transcript = await getTranscript(videoId);
+    
+    let clipsToProcess = [];
+    
     if (transcript.length === 0) {
-      throw new Error('No transcript available for this video');
+      console.log('⚠️ No YouTube transcript available, using fallback: create 5 clips from video timeline\n');
+      
+      // Fallback: Create 5 clips evenly distributed across the video
+      const videoDuration = details.duration || 600; // Default to 10 minutes if unknown
+      const clipDuration = 30; // 30 seconds per clip
+      const totalClips = 5;
+      const startInterval = Math.floor((videoDuration - (clipDuration * totalClips)) / totalClips);
+      
+      console.log(`📊 Creating ${totalClips} clips from ${videoDuration}s video...`);
+      console.log(`   Clip duration: ${clipDuration}s`);
+      console.log(`   Start interval: ${startInterval}s\n`);
+      
+      clipsToProcess = [];
+      for (let i = 0; i < totalClips; i++) {
+        const startTime = i * startInterval;
+        const endTime = startTime + clipDuration;
+        
+        if (endTime <= videoDuration) {
+          clipsToProcess.push({
+            startSeconds: startTime,
+            endSeconds: endTime,
+            reason: `Clip ${i + 1} from timeline (${startTime}s - ${endTime}s)`
+          });
+        }
+      }
+      
+      // Use video title as the title for all clips
+      const analysis = {
+        title: details.title || 'Viral Moment 🔥',
+        subtitle: 'Highlights from this video',
+        reason: 'Top moments extracted from video timeline',
+        hashtags: ['#viral', '#shorts', '#trending']
+      };
+    } else {
+      console.log(`✅ Got ${transcript.length} transcript segments\n`);
+      
+      // Step 3: AI Analysis to find best clips
+      console.log('🤖 Step 3: Analyzing video with AI for best clips...');
+      const analysis = await generateVideoAnalysis(details, transcript);
+      console.log(`✅ Analysis complete:`);
+      console.log(`   Reason: ${analysis.reason || 'N/A'}`);
+      console.log(`   Clips found: ${analysis.clips?.length || 0}\n`);
+      
+      // Step 4: Process top 5 clips (or all available if less than 5)
+      clipsToProcess = (analysis.clips || []).slice(0, 5);
+      
+      if (clipsToProcess.length === 0) {
+        throw new Error('No clips found by AI analysis');
+      }
     }
-    console.log(`✅ Got ${transcript.length} transcript segments\n`);
     
-    // Step 3: AI Analysis to find best clips
-    console.log('🤖 Step 3: Analyzing video with AI for best clips...');
-    const analysis = await generateVideoAnalysis(details, transcript);
-    console.log(`✅ Analysis complete:`);
-    console.log(`   Reason: ${analysis.reason || 'N/A'}`);
-    console.log(`   Clips found: ${analysis.clips?.length || 0}\n`);
-    
-    // Step 4: Process top 5 clips (or all available if less than 5)
-    const clipsToProcess = (analysis.clips || []).slice(0, 5);
-    
-    if (clipsToProcess.length === 0) {
-      throw new Error('No clips found by AI analysis');
-    }
+    // Use analysis if available, otherwise create default
+    const analysis = transcript.length > 0 
+      ? await generateVideoAnalysis(details, transcript)
+      : {
+          title: details.title || 'Viral Moment 🔥',
+          subtitle: 'Highlights from this video',
+          reason: 'Top moments extracted from video timeline',
+          hashtags: ['#viral', '#shorts', '#trending']
+        };
     
     console.log(`🎬 Step 4: Processing ${clipsToProcess.length} clips...\n`);
     
