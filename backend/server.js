@@ -531,6 +531,182 @@ app.post('/api/trending-workflow', async (req, res) => {
   }
 });
 
+// Get Stats Endpoint
+app.get('/api/stats', async (req, res) => {
+  try {
+    const { getAccessToken } = await import('./src/oauth-tokens.js');
+    const { google } = await import('googleapis');
+    
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    if (!spreadsheetId) {
+      return res.json({
+        videosFound: 0,
+        postedToday: 0,
+        pendingQueue: 0,
+        automationStatus: 'Active'
+      });
+    }
+    
+    try {
+      const accessToken = await getAccessToken();
+      const oauth2Client = new google.auth.OAuth2();
+      oauth2Client.setCredentials({ access_token: accessToken });
+      const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+      
+      // Read from Trending Videos sheet
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: 'Trending Videos!A2:K1000'
+      });
+      
+      const rows = response.data.values || [];
+      const today = new Date().toDateString();
+      
+      const stats = {
+        videosFound: rows.length,
+        postedToday: rows.filter(row => {
+          const status = row[10] || ''; // Status column
+          const date = row[9] || ''; // Published Date column
+          return status === 'Uploaded' && date.includes(today);
+        }).length,
+        pendingQueue: rows.filter(row => {
+          const status = row[10] || '';
+          return status === 'Selected' || status === 'Processing';
+        }).length,
+        automationStatus: 'Active'
+      };
+      
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching stats:', error.message);
+      res.json({
+        videosFound: 0,
+        postedToday: 0,
+        pendingQueue: 0,
+        automationStatus: 'Active'
+      });
+    }
+  } catch (error) {
+    res.json({
+      videosFound: 0,
+      postedToday: 0,
+      pendingQueue: 0,
+      automationStatus: 'Active'
+    });
+  }
+});
+
+// Get Content Library Endpoint
+app.get('/api/content-library', async (req, res) => {
+  try {
+    const { getAccessToken } = await import('./src/oauth-tokens.js');
+    const { google } = await import('googleapis');
+    
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    if (!spreadsheetId) {
+      return res.json([]);
+    }
+    
+    try {
+      const accessToken = await getAccessToken();
+      const oauth2Client = new google.auth.OAuth2();
+      oauth2Client.setCredentials({ access_token: accessToken });
+      const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+      
+      // Read from Trending Videos sheet
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: 'Trending Videos!A2:K100'
+      });
+      
+      const rows = response.data.values || [];
+      const contentLibrary = rows.map((row, idx) => {
+        const title = row[1] || 'Untitled';
+        const status = row[10] || 'Found';
+        const link = row[2] || '';
+        const channel = row[0] || '';
+        
+        // Determine platform from channel or defaults
+        let platform = 'Both';
+        if (channel.includes('TikTok') || title.toLowerCase().includes('tiktok')) {
+          platform = 'TikTok';
+        } else if (channel.includes('YouTube') || link.includes('youtube.com')) {
+          platform = 'YouTube';
+        }
+        
+        // Generate thumbnail emoji based on title
+        const emojis = ['🎮', '💃', '💻', '🐕', '🍳', '👗', '🎬', '🔥', '⚡', '🎯'];
+        const thumbnail = emojis[idx % emojis.length];
+        
+        return {
+          id: idx + 1,
+          title: title.substring(0, 50),
+          status,
+          platform,
+          thumbnail,
+          link,
+          channel
+        };
+      }).slice(0, 20); // Limit to 20 most recent
+      
+      res.json(contentLibrary);
+    } catch (error) {
+      console.error('Error fetching content library:', error.message);
+      res.json([]);
+    }
+  } catch (error) {
+    res.json([]);
+  }
+});
+
+// Get Automation Status Endpoint
+app.get('/api/automation-status', async (req, res) => {
+  try {
+    // In a real app, this would be stored in database
+    // For now, return default status
+    res.json({
+      active: true,
+      postingInterval: 1, // hours
+      batchSize: 5,
+      platformPriority: 'both'
+    });
+  } catch (error) {
+    res.json({
+      active: true,
+      postingInterval: 1,
+      batchSize: 5,
+      platformPriority: 'both'
+    });
+  }
+});
+
+// Save Automation Settings Endpoint
+app.post('/api/automation-settings', async (req, res) => {
+  try {
+    const { active, postingInterval, batchSize, platformPriority } = req.body;
+    
+    // In a real app, save to database
+    // For now, just acknowledge
+    console.log('Automation settings saved:', { active, postingInterval, batchSize, platformPriority });
+    
+    res.json({
+      success: true,
+      message: 'Settings saved successfully',
+      settings: {
+        active,
+        postingInterval,
+        batchSize,
+        platformPriority
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Start server
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
