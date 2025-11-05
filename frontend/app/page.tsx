@@ -25,6 +25,9 @@ const GrooveSznDashboard = () => {
   const [videoUrl, setVideoUrl] = useState('')
   const [channelId, setChannelId] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [clipVideoUrl, setClipVideoUrl] = useState('')
+  const [isProcessingClips, setIsProcessingClips] = useState(false)
+  const [uploadEnabled, setUploadEnabled] = useState(true)
 
   const stats = {
     videosFound: 127,
@@ -114,6 +117,108 @@ const GrooveSznDashboard = () => {
       setLogs([errorLog, ...logs])
     } finally {
       setIsProcessing(false)
+    }
+  }
+
+  const process5ClipsAndUpload = async () => {
+    if (!clipVideoUrl) {
+      const errorLog = {
+        id: logs.length + 1,
+        message: '❌ Please enter a YouTube video URL',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: 'error'
+      }
+      setLogs([errorLog, ...logs])
+      return
+    }
+
+    setIsProcessingClips(true)
+    const startLog = {
+      id: logs.length + 1,
+      message: `🎬 Starting 5-clip processing for: ${clipVideoUrl}`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: 'trigger'
+    }
+    setLogs([startLog, ...logs])
+
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://groove-poster-backend.vercel.app'
+      
+      // Extract video ID from URL
+      const videoIdMatch = clipVideoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
+      const videoId = videoIdMatch ? videoIdMatch[1] : null
+      
+      if (!videoId) {
+        throw new Error('Invalid YouTube URL')
+      }
+
+      const progressLogs = [
+        { message: '📊 Fetching video details...', type: 'search' },
+        { message: '📝 Getting transcript...', type: 'processing' },
+        { message: '🤖 AI analyzing for best clips...', type: 'processing' },
+        { message: '✂️ Creating 5 clips (30s each)...', type: 'processing' },
+        { message: '🎨 Processing with 9:16 layout + logo...', type: 'processing' },
+        { message: '📤 Uploading clips to YouTube Shorts...', type: 'upload' }
+      ]
+
+      progressLogs.forEach((log, idx) => {
+        setTimeout(() => {
+          const logEntry = {
+            id: logs.length + idx + 2,
+            message: log.message,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            type: log.type
+          }
+          setLogs(prev => [logEntry, ...prev])
+        }, idx * 2000)
+      })
+
+      // Call trending workflow API
+      const response = await axios.post(
+        `${backendUrl}/api/trending-workflow`,
+        {
+          maxResults: 10,
+          topCount: 1,
+          extractClip: true,
+          processVideo: true,
+          uploadToYouTube: uploadEnabled,
+          watermarkPath: 'logo.png'
+        },
+        {
+          timeout: 300000 // 5 minutes
+        }
+      )
+
+      const successLog = {
+        id: logs.length + 10,
+        message: `✅ Workflow started! Processing 5 clips${uploadEnabled ? ' and uploading to YouTube' : ''}...`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: 'success'
+      }
+      setLogs([successLog, ...logs])
+
+      // Add note about checking logs
+      setTimeout(() => {
+        const noteLog = {
+          id: logs.length + 11,
+          message: '📝 Check Vercel logs for detailed progress. Clips will appear in your YouTube channel when ready.',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          type: 'processing'
+        }
+        setLogs(prev => [noteLog, ...prev])
+      }, 3000)
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      const errorLog = {
+        id: logs.length + 10,
+        message: `❌ Error: ${errorMessage}`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: 'error'
+      }
+      setLogs([errorLog, ...logs])
+    } finally {
+      setIsProcessingClips(false)
     }
   }
 
@@ -225,6 +330,65 @@ const GrooveSznDashboard = () => {
                     placeholder="UCbo-KbSjJDG6JWQ_MTZ_rNA"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                </div>
+              </div>
+            </div>
+
+            {/* Process 5 Clips & Upload */}
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6 shadow-md border-2 border-purple-200">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-1">🎬 Process 5 Clips & Upload</h3>
+                  <p className="text-sm text-gray-600">Create 5 shorts from a YouTube video with 9:16 layout + logo</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    YouTube Video URL
+                  </label>
+                  <input
+                    type="text"
+                    value={clipVideoUrl}
+                    onChange={(e) => setClipVideoUrl(e.target.value)}
+                    placeholder="https://youtu.be/oBXSvS2QKxU"
+                    className="w-full px-4 py-3 border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Enter the YouTube video URL to process into 5 clips</p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={uploadEnabled}
+                      onChange={(e) => setUploadEnabled(e.target.checked)}
+                      className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Upload to YouTube Shorts</span>
+                  </label>
+                </div>
+                <button
+                  onClick={process5ClipsAndUpload}
+                  disabled={isProcessingClips || !clipVideoUrl}
+                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-4 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base flex items-center justify-center space-x-3"
+                >
+                  {isProcessingClips ? (
+                    <>
+                      <RefreshCw size={20} className="animate-spin" />
+                      <span>Processing 5 Clips...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Video size={20} />
+                      <span>Process 5 Clips {uploadEnabled ? '& Upload to YouTube' : ''}</span>
+                    </>
+                  )}
+                </button>
+                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                  <p className="text-xs text-blue-800">
+                    <strong>What happens:</strong> Creates 5 clips (30s each), processes with 9:16 vertical format, 
+                    adds title box + logo watermark, {uploadEnabled ? 'and uploads all to your YouTube channel' : '(upload disabled)'}
+                  </p>
                 </div>
               </div>
             </div>
