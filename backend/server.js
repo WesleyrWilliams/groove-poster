@@ -402,6 +402,54 @@ app.get('/oauth2/test', async (req, res) => {
   }
 });
 
+// Process 5 Clips from Specific Video
+app.post('/api/process-5-clips', async (req, res) => {
+  try {
+    const { 
+      videoUrl,
+      uploadToYouTube = false,
+      watermarkPath = null
+    } = req.body;
+    
+    if (!videoUrl) {
+      return res.status(400).json({ error: 'videoUrl is required' });
+    }
+    
+    console.log(`\n🎬 Processing 5 clips from video...`);
+    console.log(`   Video URL: ${videoUrl}`);
+    console.log(`   Upload to YouTube: ${uploadToYouTube}\n`);
+    
+    // Import test script function
+    const { process5ClipsFromVideo } = await import('./src/clip-processor.js');
+    
+    // Run processing asynchronously
+    process5ClipsFromVideo(videoUrl, {
+      uploadToYouTube,
+      watermarkPath: watermarkPath || './logo.png'
+    }).then(result => {
+      console.log('\n✅ 5-clip processing completed');
+      console.log(`   Processed: ${result.processedClips}/${result.totalClips} clips`);
+      if (uploadToYouTube) {
+        console.log(`   Uploaded: ${result.uploadedClips} clips to YouTube`);
+      }
+    }).catch(err => {
+      console.error('❌ 5-clip processing failed:', err.message);
+    });
+    
+    res.json({
+      success: true,
+      message: '5-clip processing started',
+      note: 'Processing in background - check logs for progress',
+      videoUrl
+    });
+  } catch (error) {
+    console.error('Error starting 5-clip processing:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to start 5-clip processing',
+    });
+  }
+});
+
 // Trending Workflow - Full AI Clip Fetcher Integration
 app.post('/api/trending-workflow', async (req, res) => {
   try {
@@ -409,16 +457,46 @@ app.post('/api/trending-workflow', async (req, res) => {
       maxResults = 20,
       topCount = 5,
       extractClip = true,
-      uploadToYouTube = false
+      uploadToYouTube = false,
+      videoUrl = null // Optional: process specific video instead of trending
     } = req.body;
     
     console.log(`\n🚀 Starting Trending Workflow...`);
     console.log(`   Max Results: ${maxResults}`);
     console.log(`   Top Count: ${topCount}`);
     console.log(`   Extract Clip: ${extractClip}`);
-    console.log(`   Upload to YouTube: ${uploadToYouTube}\n`);
+    console.log(`   Upload to YouTube: ${uploadToYouTube}`);
+    if (videoUrl) {
+      console.log(`   Specific Video: ${videoUrl}`);
+    }
+    console.log('');
     
-    // Run workflow asynchronously
+    // If specific video URL provided, process that instead
+    if (videoUrl) {
+      const { process5ClipsFromVideo } = await import('./src/clip-processor.js');
+      
+      process5ClipsFromVideo(videoUrl, {
+        uploadToYouTube,
+        watermarkPath: './logo.png'
+      }).then(result => {
+        console.log('\n✅ 5-clip processing completed');
+        console.log(`   Processed: ${result.processedClips}/${result.totalClips} clips`);
+        if (uploadToYouTube) {
+          console.log(`   Uploaded: ${result.uploadedClips} clips to YouTube`);
+        }
+      }).catch(err => {
+        console.error('❌ 5-clip processing failed:', err.message);
+      });
+      
+      return res.json({
+        success: true,
+        message: '5-clip processing started for specific video',
+        note: 'Processing in background - check logs for progress',
+        videoUrl
+      });
+    }
+    
+    // Run trending workflow asynchronously
     runTrendingWorkflow({
       maxResults,
       topCount,

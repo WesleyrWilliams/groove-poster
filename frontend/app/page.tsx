@@ -173,14 +173,11 @@ const GrooveSznDashboard = () => {
         }, idx * 2000)
       })
 
-      // Call trending workflow API
+      // Call 5-clip processing API
       const response = await axios.post(
-        `${backendUrl}/api/trending-workflow`,
+        `${backendUrl}/api/process-5-clips`,
         {
-          maxResults: 10,
-          topCount: 1,
-          extractClip: true,
-          processVideo: true,
+          videoUrl: clipVideoUrl,
           uploadToYouTube: uploadEnabled,
           watermarkPath: 'logo.png'
         },
