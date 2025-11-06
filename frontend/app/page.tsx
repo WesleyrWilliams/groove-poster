@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Play, Pause, RefreshCw, Settings, Video, Clock, TrendingUp, CheckCircle, AlertCircle, Trash2, Edit, Upload } from 'lucide-react'
+import { Play, RefreshCw, Settings, Video, Clock, TrendingUp, CheckCircle, AlertCircle, Trash2, Upload } from 'lucide-react'
 import axios from 'axios'
 
 interface LogEntry {
@@ -22,26 +22,24 @@ interface ContentItem {
 }
 
 const GrooveSznDashboard = () => {
-  const [activeTab, setActiveTab] = useState('dashboard')
-  const [automationActive, setAutomationActive] = useState(true)
+  const [activeTab, setActiveTab] = useState<string>('dashboard')
+  const [automationActive, setAutomationActive] = useState<boolean>(true)
   const [logs, setLogs] = useState<LogEntry[]>([])
-  const [postingInterval, setPostingInterval] = useState('1')
-  const [batchSize, setBatchSize] = useState('5')
-  const [platformPriority, setPlatformPriority] = useState('both')
-  const [nextRunTime, setNextRunTime] = useState(3600)
-  const [flowStep, setFlowStep] = useState(-1) // -1 means not running
-  const [isFlowRunning, setIsFlowRunning] = useState(false)
+  const [postingInterval, setPostingInterval] = useState<string>('1')
+  const [batchSize, setBatchSize] = useState<string>('5')
+  const [platformPriority, setPlatformPriority] = useState<string>('both')
+  const [nextRunTime, setNextRunTime] = useState<number>(3600)
+  const [flowStep, setFlowStep] = useState<number>(-1)
+  const [isFlowRunning, setIsFlowRunning] = useState<boolean>(false)
   const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null)
-  
-  // Video processing state
-  const [videoUrl, setVideoUrl] = useState('')
-  const [channelId, setChannelId] = useState('')
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [clipVideoUrl, setClipVideoUrl] = useState('')
-  const [isProcessingClips, setIsProcessingClips] = useState(false)
-  const [uploadEnabled, setUploadEnabled] = useState(true)
-  
-  // Live data state
+
+  const [videoUrl, setVideoUrl] = useState<string>('')
+  const [channelId, setChannelId] = useState<string>('')
+  const [isProcessing, setIsProcessing] = useState<boolean>(false)
+  const [clipVideoUrl, setClipVideoUrl] = useState<string>('')
+  const [isProcessingClips, setIsProcessingClips] = useState<boolean>(false)
+  const [uploadEnabled, setUploadEnabled] = useState<boolean>(true)
+
   const [stats, setStats] = useState({
     videosFound: 0,
     postedToday: 0,
@@ -49,106 +47,87 @@ const GrooveSznDashboard = () => {
     automationStatus: 'Active'
   })
   const [contentLibrary, setContentLibrary] = useState<ContentItem[]>([])
-  const [isLoadingStats, setIsLoadingStats] = useState(true)
+  const [isLoadingStats, setIsLoadingStats] = useState<boolean>(true)
 
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://groove-poster-backend.vercel.app'
 
   const flowSteps = [
-    { icon: '🔍', label: 'Search', color: 'bg-blue-500' },
-    { icon: '✂️', label: 'Clip', color: 'bg-purple-500' },
-    { icon: '📝', label: 'Transcribe', color: 'bg-green-500' },
-    { icon: '📤', label: 'Post', color: 'bg-orange-500' },
-    { icon: '✅', label: 'Complete', color: 'bg-teal-500' }
+    { icon: <span role="img" aria-label="search">🔍</span>, label: 'Search', color: 'bg-blue-500' },
+    { icon: <span role="img" aria-label="clip">✂️</span>, label: 'Clip', color: 'bg-purple-500' },
+    { icon: <span role="img" aria-label="transcribe">📝</span>, label: 'Transcribe', color: 'bg-green-500' },
+    { icon: <span role="img" aria-label="post">📤</span>, label: 'Post', color: 'bg-orange-500' },
+    { icon: <span role="img" aria-label="complete">✅</span>, label: 'Complete', color: 'bg-teal-500' }
   ]
 
-  // Fetch stats on mount and periodically
+  // Stats fetch
   useEffect(() => {
+    let isMounted = true
     const fetchStats = async () => {
       try {
         const response = await axios.get(`${backendUrl}/api/stats`)
-        setStats(response.data)
-        setIsLoadingStats(false)
-      } catch (error) {
-        console.error('Error fetching stats:', error)
-        setIsLoadingStats(false)
+        if (isMounted) {
+          setStats(response.data)
+          setIsLoadingStats(false)
+        }
+      } catch {
+        if (isMounted) setIsLoadingStats(false)
       }
     }
-    
     fetchStats()
-    const interval = setInterval(fetchStats, 30000) // Refresh every 30 seconds
-    return () => clearInterval(interval)
+    const interval = setInterval(fetchStats, 30000)
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+    }
   }, [backendUrl])
 
-  // Fetch content library on mount and when tab changes
+  // Content library fetch
   useEffect(() => {
+    let isMounted = true
     if (activeTab === 'library') {
       const fetchLibrary = async () => {
         try {
           const response = await axios.get(`${backendUrl}/api/content-library`)
-          setContentLibrary(response.data)
-        } catch (error) {
-          console.error('Error fetching content library:', error)
-        }
+          if (isMounted) setContentLibrary(response.data)
+        } catch {}
       }
       fetchLibrary()
-      const interval = setInterval(fetchLibrary, 60000) // Refresh every minute
-      return () => clearInterval(interval)
+      const interval = setInterval(fetchLibrary, 60000)
+      return () => {
+        isMounted = false
+        clearInterval(interval)
+      }
     }
   }, [activeTab, backendUrl])
 
-  // Load automation settings from localStorage
+  // Persist settings from localStorage
   useEffect(() => {
-    const savedSettings = localStorage.getItem('automationSettings')
-    if (savedSettings) {
-      try {
+    try {
+      const savedSettings = typeof window !== 'undefined' ? localStorage.getItem('automationSettings') : null
+      if (savedSettings) {
         const settings = JSON.parse(savedSettings)
         setAutomationActive(settings.active !== false)
-        setPostingInterval(settings.postingInterval || '1')
-        setBatchSize(settings.batchSize || '5')
+        setPostingInterval(settings.postingInterval?.toString() || '1')
+        setBatchSize(settings.batchSize?.toString() || '5')
         setPlatformPriority(settings.platformPriority || 'both')
-      } catch (e) {
-        console.error('Error loading settings:', e)
       }
-    }
+    } catch {}
   }, [])
 
-  // Calculate next run time based on interval
   useEffect(() => {
     const intervalHours = parseInt(postingInterval) || 1
     const intervalSeconds = intervalHours * 3600
-    
     setNextRunTime(intervalSeconds)
     const timer = setInterval(() => {
       setNextRunTime(prev => {
         if (prev <= 1) {
-          return intervalSeconds // Reset when countdown reaches 0
+          return intervalSeconds
         }
         return prev - 1
       })
     }, 1000)
     return () => clearInterval(timer)
   }, [postingInterval])
-
-  // Flow step animation (only when flow is running)
-  useEffect(() => {
-    if (!isFlowRunning) {
-      setFlowStep(-1)
-      return
-    }
-    
-    let currentStep = 0
-    const flowTimer = setInterval(() => {
-      setFlowStep(currentStep)
-      currentStep++
-      if (currentStep >= flowSteps.length) {
-        setIsFlowRunning(false)
-        setFlowStep(-1)
-        clearInterval(flowTimer)
-      }
-    }, 3000) // 3 seconds per step
-    
-    return () => clearInterval(flowTimer)
-  }, [isFlowRunning])
 
   const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600)
@@ -157,128 +136,112 @@ const GrooveSznDashboard = () => {
     return `${hrs}h ${mins}m ${secs}s`
   }
 
-  // Fetch logs from backend
+  // Fetch logs from backend, ONLY for real workflows
   const fetchLogs = async (workflowId: string | null = null) => {
     try {
       const params = new URLSearchParams()
       if (workflowId) params.append('workflowId', workflowId)
       params.append('limit', '100')
-      
       const response = await axios.get(`${backendUrl}/api/logs?${params.toString()}`)
       const fetchedLogs = response.data.logs || []
-      
-      // Convert backend log format to frontend format
-      const formattedLogs: LogEntry[] = fetchedLogs.map((log: any) => ({
-        id: log.id,
+      const formattedLogs: LogEntry[] = fetchedLogs.map((log: any, idx: number) => ({
+        id: typeof log.id !== "undefined" ? log.id : idx,
         message: log.message,
-        time: log.time || new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        time: log.time || (log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''),
         type: log.type || 'processing'
       }))
-      
       setLogs(formattedLogs)
       return formattedLogs
-    } catch (error) {
-      console.error('Error fetching logs:', error)
+    } catch {
       return []
     }
   }
 
-  // Poll for logs when workflow is running
+  // Real flow: only fetch logs when a workflow is running
   useEffect(() => {
+    let interval: NodeJS.Timeout
     if (!currentWorkflowId || !isFlowRunning) return
-    
-    // Fetch logs immediately
     fetchLogs(currentWorkflowId)
-    
-    // Poll every 2 seconds while workflow is running
-    const interval = setInterval(() => {
+    interval = setInterval(() => {
       fetchLogs(currentWorkflowId).then((newLogs) => {
-        // Update flow step based on log types
+        // Step calculation based on live backend logs only
         const hasSearch = newLogs.some(log => log.type === 'search')
-        const hasClip = newLogs.some(log => log.message.includes('clip') || log.message.includes('Clipping'))
-        // FIX: type 'transcribe' (not valid), so detect by message instead
+        const hasClip = newLogs.some(log => typeof log.message === 'string' && log.message.toLowerCase().includes('clip'))
         const hasTranscribe =
           newLogs.some(
             log =>
               log.type === 'processing' &&
-              (log.message.toLowerCase().includes('transcribe') ||
-                log.message.toLowerCase().includes('transcription'))
+              (typeof log.message === 'string' && (log.message.toLowerCase().includes('transcribe') ||
+                log.message.toLowerCase().includes('transcription')))
           )
         const hasUpload = newLogs.some(log => log.type === 'upload')
-        // FIX: type 'complete' not in LogEntry, so just check for 'success'
         const hasComplete =
-          newLogs.some(log => log.type === 'success' && (log.message.toLowerCase().includes('complete') || log.message.toLowerCase().includes('completed')))
-        
+          newLogs.some(log =>
+            log.type === 'success' &&
+            typeof log.message === 'string' &&
+            (log.message.toLowerCase().includes('complete') ||
+              log.message.toLowerCase().includes('completed'))
+          )
+
         let step = -1
         if (hasComplete) step = 4
         else if (hasUpload) step = 3
         else if (hasTranscribe) step = 2
         else if (hasClip) step = 1
         else if (hasSearch) step = 0
-        
+
         setFlowStep(step)
-        
-        // Check if workflow is complete
-        if (hasComplete || newLogs.some(log => log.type === 'error' && log.message.toLowerCase().includes('completed'))) {
+        if (
+          hasComplete ||
+          newLogs.some(
+            log =>
+              log.type === 'error' &&
+              typeof log.message === 'string' &&
+              log.message.toLowerCase().includes('completed')
+          )
+        ) {
           setIsFlowRunning(false)
         }
       })
     }, 2000)
-    
-    return () => clearInterval(interval)
+    return () => {
+      if (interval) clearInterval(interval)
+    }
   }, [currentWorkflowId, isFlowRunning, backendUrl])
 
-  // Clear logs on mount and only fetch when workflow is running
+  // Clear backend logs on mount (real logs only)
   useEffect(() => {
-    // Start with empty logs - clear backend logs on mount
     setLogs([])
-    axios.get(`${backendUrl}/api/logs?clear=true`).catch(() => {}) // Clear backend logs silently
-    
-    // Only fetch logs if a workflow is running
-    const interval = setInterval(() => {
-      if (isFlowRunning && currentWorkflowId) {
-        fetchLogs(currentWorkflowId)
-      }
-    }, 2000) // Poll every 2 seconds when running
-    return () => clearInterval(interval)
-  }, [backendUrl, isFlowRunning, currentWorkflowId])
+    axios.get(`${backendUrl}/api/logs?clear=true`).catch(() => {})
+  }, [backendUrl])
 
   const triggerFlowNow = async () => {
     setIsProcessing(true)
     setIsFlowRunning(true)
     setFlowStep(0)
-
     try {
       if (videoUrl) {
         const response = await axios.post(`${backendUrl}/api/process-video`, { videoUrl })
         const workflowId = response.data.workflowId
-        if (workflowId) {
-          setCurrentWorkflowId(workflowId)
-        }
+        if (workflowId) setCurrentWorkflowId(workflowId)
       } else if (channelId) {
         const response = await axios.post(`${backendUrl}/api/process-channel`, { channelId })
         const workflowId = response.data.workflowId
-        if (workflowId) {
-          setCurrentWorkflowId(workflowId)
-        }
+        if (workflowId) setCurrentWorkflowId(workflowId)
       } else {
         setIsFlowRunning(false)
         setFlowStep(-1)
         alert('⚠️ Please enter a video URL or channel ID')
         return
       }
-      
-      // Refresh stats after processing starts
       setTimeout(async () => {
         try {
           const response = await axios.get(`${backendUrl}/api/stats`)
           setStats(response.data)
-        } catch (e) {
-          console.error('Error refreshing stats:', e)
-        }
+        } catch {}
       }, 2000)
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    } catch (error: any) {
+      const errorMessage = error?.message || (error instanceof Error ? error.message : 'Unknown error occurred')
       setIsFlowRunning(false)
       setFlowStep(-1)
       alert(`❌ Error: ${errorMessage}`)
@@ -292,21 +255,13 @@ const GrooveSznDashboard = () => {
       alert('❌ Please enter a YouTube video URL')
       return
     }
-
     setIsProcessingClips(true)
     setIsFlowRunning(true)
     setFlowStep(0)
-
     try {
-      // Extract video ID from URL
       const videoIdMatch = clipVideoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
       const videoId = videoIdMatch ? videoIdMatch[1] : null
-      
-      if (!videoId) {
-        throw new Error('Invalid YouTube URL')
-      }
-
-      // Call 5-clip processing API
+      if (!videoId) throw new Error('Invalid YouTube URL')
       const response = await axios.post(
         `${backendUrl}/api/process-5-clips`,
         {
@@ -315,16 +270,11 @@ const GrooveSznDashboard = () => {
           watermarkPath: 'logo.png'
         },
         {
-          timeout: 300000 // 5 minutes
+          timeout: 300000
         }
       )
-
       const workflowId = response.data.workflowId
-      if (workflowId) {
-        setCurrentWorkflowId(workflowId)
-      }
-      
-      // Refresh stats and library periodically
+      if (workflowId) setCurrentWorkflowId(workflowId)
       const refreshInterval = setInterval(async () => {
         try {
           const [statsRes, libRes] = await Promise.all([
@@ -333,16 +283,11 @@ const GrooveSznDashboard = () => {
           ])
           setStats(statsRes.data)
           setContentLibrary(libRes.data)
-        } catch (e) {
-          console.error('Error refreshing data:', e)
-        }
+        } catch {}
       }, 10000)
-      
-      // Clear interval after 5 minutes
       setTimeout(() => clearInterval(refreshInterval), 300000)
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    } catch (error: any) {
+      const errorMessage = error?.message || (error instanceof Error ? error.message : 'Unknown error occurred')
       setIsFlowRunning(false)
       setFlowStep(-1)
       alert(`❌ Error: ${errorMessage}`)
@@ -359,27 +304,29 @@ const GrooveSznDashboard = () => {
         batchSize: parseInt(batchSize),
         platformPriority
       }
-      
-      // Save to localStorage
-      localStorage.setItem('automationSettings', JSON.stringify(settings))
-      
-      // Save to backend
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('automationSettings', JSON.stringify(settings))
+      }
       await axios.post(`${backendUrl}/api/automation-settings`, settings)
-      
       alert('✅ Settings saved successfully')
-    } catch (error) {
-      alert(`❌ Error saving settings: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } catch (error: any) {
+      alert(`❌ Error saving settings: ${error?.message || (error instanceof Error ? error.message : 'Unknown error')}`)
     }
   }
 
   const deleteVideo = async (videoId: number) => {
-    if (!confirm('Are you sure you want to delete this video?')) return
-    
-    // In a real app, this would call an API to delete
+    if (typeof window !== "undefined" && !window.confirm('Are you sure you want to delete this video?')) return
     setContentLibrary(prev => prev.filter(v => v.id !== videoId))
   }
 
-  const StatCard = ({ icon: Icon, title, value, subtitle }: { icon: React.ElementType, title: string, value: string | number, subtitle: string }) => (
+  type StatCardProps = {
+    icon: React.ElementType
+    title: string
+    value: string | number
+    subtitle: string
+  }
+
+  const StatCard = ({ icon: Icon, title, value, subtitle }: StatCardProps) => (
     <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-blue-100">
       <div className="flex items-start justify-between">
         <div>
@@ -398,7 +345,6 @@ const GrooveSznDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b border-blue-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
@@ -423,7 +369,6 @@ const GrooveSznDashboard = () => {
         </div>
       </header>
 
-      {/* Navigation Tabs */}
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8 overflow-x-auto">
@@ -441,6 +386,7 @@ const GrooveSznDashboard = () => {
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
+                type="button"
               >
                 <tab.icon size={18} />
                 <span>{tab.label}</span>
@@ -450,7 +396,6 @@ const GrooveSznDashboard = () => {
         </div>
       </nav>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
@@ -459,6 +404,7 @@ const GrooveSznDashboard = () => {
               <button
                 onClick={triggerFlowNow}
                 disabled={isProcessing}
+                type="button"
                 className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RefreshCw size={20} className={isProcessing ? 'animate-spin' : ''} />
@@ -466,7 +412,6 @@ const GrooveSznDashboard = () => {
               </button>
             </div>
 
-            {/* Quick Video Input */}
             <div className="bg-white rounded-xl p-6 shadow-md border border-blue-100">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Process</h3>
               <div className="grid md:grid-cols-2 gap-4">
@@ -493,7 +438,6 @@ const GrooveSznDashboard = () => {
               </div>
             </div>
 
-            {/* Process 5 Clips & Upload */}
             <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6 shadow-md border-2 border-purple-200">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -529,6 +473,7 @@ const GrooveSznDashboard = () => {
                 <button
                   onClick={process5ClipsAndUpload}
                   disabled={isProcessingClips || !clipVideoUrl}
+                  type="button"
                   className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-4 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base flex items-center justify-center space-x-3"
                 >
                   {isProcessingClips ? (
@@ -552,7 +497,6 @@ const GrooveSznDashboard = () => {
               </div>
             </div>
 
-            {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatCard
                 icon={Video}
@@ -580,7 +524,6 @@ const GrooveSznDashboard = () => {
               />
             </div>
 
-            {/* Flow Animation - Only show when workflow is running */}
             {(isFlowRunning || flowStep >= 0) && (
               <div className="bg-white rounded-xl p-6 shadow-md border border-blue-100">
                 <h3 className="text-lg font-semibold text-gray-800 mb-6">Current Flow Progress</h3>
@@ -612,7 +555,6 @@ const GrooveSznDashboard = () => {
               </div>
             )}
 
-            {/* Live Logs */}
             <div className="bg-white rounded-xl p-6 shadow-md border border-blue-100">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Live Activity Log</h3>
@@ -621,10 +563,9 @@ const GrooveSznDashboard = () => {
                     try {
                       await axios.get(`${backendUrl}/api/logs?clear=true`)
                       setLogs([])
-                    } catch (error) {
-                      console.error('Error clearing logs:', error)
-                    }
+                    } catch {}
                   }}
+                  type="button"
                   className="text-xs text-gray-500 hover:text-gray-700"
                 >
                   Clear Logs
@@ -662,7 +603,6 @@ const GrooveSznDashboard = () => {
         {activeTab === 'settings' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-800">Automation Control Center</h2>
-            
             <div className="bg-white rounded-xl p-6 shadow-md border border-blue-100 space-y-6">
               <div className="flex items-center justify-between pb-6 border-b">
                 <div>
@@ -670,9 +610,8 @@ const GrooveSznDashboard = () => {
                   <p className="text-sm text-gray-500">Enable or disable automated posting</p>
                 </div>
                 <button
-                  onClick={() => {
-                    setAutomationActive(!automationActive)
-                  }}
+                  onClick={() => setAutomationActive(!automationActive)}
+                  type="button"
                   className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors ${
                     automationActive ? 'bg-blue-600' : 'bg-gray-300'
                   }`}
@@ -712,8 +651,8 @@ const GrooveSznDashboard = () => {
                     value={batchSize}
                     onChange={(e) => setBatchSize(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    min="1"
-                    max="20"
+                    min={1}
+                    max={20}
                   />
                 </div>
 
@@ -741,13 +680,20 @@ const GrooveSznDashboard = () => {
                 <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                   <div
                     className="bg-blue-600 h-2 rounded-full transition-all duration-1000"
-                    style={{ width: `${((parseInt(postingInterval) * 3600 - nextRunTime) / (parseInt(postingInterval) * 3600)) * 100}%` }}
+                    style={{
+                      width: `${
+                        ((parseInt(postingInterval) * 3600 - nextRunTime) /
+                          (parseInt(postingInterval) * 3600)) *
+                        100
+                      }%`
+                    }}
                   ></div>
                 </div>
               </div>
 
               <button 
                 onClick={saveSettings}
+                type="button"
                 className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-2"
               >
                 <Settings size={20} />
@@ -767,12 +713,11 @@ const GrooveSznDashboard = () => {
                     try {
                       const response = await axios.get(`${backendUrl}/api/content-library`)
                       setContentLibrary(response.data)
-                    } catch (error) {
-                      console.error('Error refreshing library:', error)
-                    }
+                    } catch {}
                   }
                   fetchLibrary()
                 }}
+                type="button"
                 className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <RefreshCw size={20} />
@@ -790,7 +735,15 @@ const GrooveSznDashboard = () => {
                 {contentLibrary.map(video => (
                   <div key={video.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-blue-100">
                     <div className="bg-gradient-to-br from-blue-100 to-purple-100 h-48 flex items-center justify-center text-6xl">
-                      {video.thumbnail}
+                      {typeof video.thumbnail === 'string'
+                        // thumbnail is probably a URL; render as image
+                        ? <img
+                            src={video.thumbnail}
+                            alt={video.title}
+                            className="object-cover w-full h-full"
+                            style={{ maxHeight: "11rem", maxWidth: '100%' }}
+                          />
+                        : video.thumbnail}
                     </div>
                     <div className="p-4">
                       <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">{video.title}</h3>
@@ -824,6 +777,7 @@ const GrooveSznDashboard = () => {
                         )}
                         <button 
                           onClick={() => deleteVideo(video.id)}
+                          type="button"
                           className="bg-red-50 text-red-600 p-2 rounded-lg hover:bg-red-100 transition-colors"
                           title="Delete"
                         >
@@ -841,7 +795,6 @@ const GrooveSznDashboard = () => {
         {activeTab === 'monitor' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-800">Flow Monitor</h2>
-            
             <div className="bg-white rounded-xl p-8 shadow-md border border-blue-100">
               <div className="space-y-8">
                 {flowSteps.map((step, idx) => (
@@ -880,10 +833,9 @@ const GrooveSznDashboard = () => {
                     try {
                       await axios.get(`${backendUrl}/api/logs?clear=true`)
                       setLogs([])
-                    } catch (error) {
-                      console.error('Error clearing logs:', error)
-                    }
+                    } catch {}
                   }}
+                  type="button"
                   className="text-xs text-gray-500 hover:text-gray-700"
                 >
                   Clear

@@ -9,7 +9,8 @@
     "start": "node server.js",
     "test": "node test-ai-youtube-flow-openrouter.js",
     "test:full": "node test-ai-youtube-flow-openrouter.js",
-    "test:complete": "node test-ai-youtube-flow-complete.js"
+    "test:complete": "node test-ai-youtube-flow-complete.js",
+    "test:pipeline": "node tests/fullPipelineTest.js"
   },
   "keywords": [
     "shorts",

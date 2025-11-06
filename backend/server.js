@@ -124,6 +124,38 @@ app.get('/terms', (req, res) => {
   `);
 });
 
+// Run full pipeline test
+app.post('/api/test-pipeline', async (req, res) => {
+  try {
+    const { runFullPipelineTest } = await import('./tests/fullPipelineTest.js');
+    
+    // Return immediately - run test in background
+    res.json({
+      success: true,
+      message: 'Pipeline test started',
+      note: 'Running full pipeline test in background - check logs for progress'
+    });
+    
+    // Run test asynchronously
+    setImmediate(async () => {
+      try {
+        const result = await runFullPipelineTest();
+        console.log('✅ Pipeline test completed:', result);
+      } catch (error) {
+        console.error('❌ Pipeline test failed:', error.message);
+        console.error(error.stack);
+      }
+    });
+  } catch (error) {
+    console.error('Error starting pipeline test:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: error.message || 'Failed to start pipeline test'
+      });
+    }
+  }
+});
+
 // Get workflow logs endpoint
 app.get('/api/logs', async (req, res) => {
   try {
