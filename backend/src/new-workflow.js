@@ -2,10 +2,12 @@ import { getVideoDetails, getChannelVideos, searchTrendingVideos } from './youtu
 import { getTranscript, getBestMoments } from './transcript-api.js';
 import { generateCaption } from './openrouter.js';
 import { uploadToTikTok, uploadToInstagram, uploadToYouTube, uploadToFacebook } from './social-uploads.js';
+import { addLog } from './workflow-logger.js';
 
 export async function processVideoWithFreeTools(videoUrl, options = {}) {
+  const { workflowId } = options;
   try {
-    console.log(`🎬 Processing video: ${videoUrl}`);
+    addLog(`🎬 Starting video processing workflow`, 'trigger', workflowId);
     
     // Extract video ID from URL
     const videoId = extractVideoId(videoUrl);
@@ -16,10 +18,10 @@ export async function processVideoWithFreeTools(videoUrl, options = {}) {
     // Step 1: Get video details (with timeout - don't block if slow)
     let videoDetails;
     try {
-      console.log('📊 Fetching video details...');
+      addLog('📊 Fetching video details...', 'search', workflowId);
       // Use Promise.race with timeout, but make getVideoDetails itself handle errors gracefully
       const detailsPromise = getVideoDetails(videoId).catch(err => {
-        console.warn('⚠️ getVideoDetails failed, using minimal details:', err.message);
+        addLog(`⚠️ Video details fetch failed, using minimal details`, 'processing', workflowId);
         return {
           videoId,
           title: 'Video',
@@ -35,7 +37,7 @@ export async function processVideoWithFreeTools(videoUrl, options = {}) {
       
       const timeoutPromise = new Promise((resolve) => 
         setTimeout(() => {
-          console.warn('⚠️ Video details fetch timed out (5s), using minimal details');
+          addLog(`⚠️ Video details fetch timed out (5s), using minimal details`, 'processing', workflowId);
           resolve({
             videoId,
             title: 'Video',
@@ -51,10 +53,10 @@ export async function processVideoWithFreeTools(videoUrl, options = {}) {
       );
       
       videoDetails = await Promise.race([detailsPromise, timeoutPromise]);
-      console.log(`✅ Video details: "${videoDetails.title}"`);
+      addLog(`✅ Found: "${videoDetails.title}"`, 'success', workflowId);
     } catch (error) {
       // Final fallback - should never reach here, but just in case
-      console.warn('⚠️ Unexpected error getting video details, using minimal details:', error.message);
+      addLog(`⚠️ Unexpected error getting video details, using minimal details`, 'processing', workflowId);
       videoDetails = {
         videoId,
         title: 'Video',
@@ -71,35 +73,33 @@ export async function processVideoWithFreeTools(videoUrl, options = {}) {
     // Step 2: Get transcript (free)
     let transcript = [];
     try {
-      console.log('📝 Getting transcript...');
+      addLog('📝 Getting transcript...', 'transcribe', workflowId);
       transcript = await getTranscript(videoId);
       
       if (!transcript || transcript.length === 0) {
-        console.log('⚠️ No transcript available, continuing with minimal processing');
+        addLog('⚠️ No transcript available, continuing with minimal processing', 'processing', workflowId);
         transcript = [];
       } else {
-        console.log(`✅ Got ${transcript.length} transcript segments`);
+        addLog(`✅ Got ${transcript.length} transcript segments`, 'success', workflowId);
       }
     } catch (error) {
-      console.warn('⚠️ Transcript fetch failed, continuing without transcript:', error.message);
+      addLog(`⚠️ Transcript fetch failed, continuing without transcript: ${error.message}`, 'processing', workflowId);
       transcript = [];
     }
     
     if (transcript.length === 0) {
-      console.log('⚠️ No transcript available - video processing may be limited');
+      addLog('⚠️ No transcript available - video processing may be limited', 'processing', workflowId);
       // Don't return error - continue with what we have
-    } else {
-      console.log(`✅ Got ${transcript.length} transcript segments`);
     }
     
     // Step 3: Find best moments using AI
     let bestMoments = [];
     try {
-      console.log('🎯 Finding best moments...');
+      addLog('🎯 Finding best moments with AI...', 'processing', workflowId);
       if (transcript.length > 0) {
         bestMoments = await findBestMomentsWithAI(transcript, videoDetails);
       } else {
-        console.warn('⚠️ Skipping AI moment finding - no transcript available');
+        addLog('⚠️ Skipping AI moment finding - no transcript available', 'processing', workflowId);
         // Return success but with limited processing
         return { 
           success: true, 
@@ -110,7 +110,7 @@ export async function processVideoWithFreeTools(videoUrl, options = {}) {
       }
       
       if (!bestMoments || bestMoments.length === 0) {
-        console.log('⚠️ No good moments found');
+        addLog('⚠️ No good moments found', 'processing', workflowId);
         return { 
           success: true, 
           message: 'No engaging moments found in transcript',
@@ -119,7 +119,7 @@ export async function processVideoWithFreeTools(videoUrl, options = {}) {
         };
       }
     } catch (error) {
-      console.error('❌ Error finding best moments:', error.message);
+      addLog(`❌ Error finding best moments: ${error.message}`, 'error', workflowId);
       return { 
         success: true, 
         message: 'Video processing started but AI analysis failed',
@@ -129,10 +129,10 @@ export async function processVideoWithFreeTools(videoUrl, options = {}) {
       };
     }
     
-    console.log(`✅ Found ${bestMoments.length} viral moments`);
+    addLog(`✅ Found ${bestMoments.length} viral moments`, 'success', workflowId);
     
     // Step 4: Generate captions for each clip
-    console.log('✍️ Generating captions...');
+    addLog('✍️ Generating captions...', 'processing', workflowId);
     const clipsWithCaptions = [];
     
     for (const moment of bestMoments) {
@@ -143,7 +143,7 @@ export async function processVideoWithFreeTools(videoUrl, options = {}) {
       });
     }
     
-    console.log('✅ Captions generated');
+    addLog('✅ Captions generated', 'success', workflowId);
     
     // Step 5: Upload to social media platforms
     console.log('⏫ Uploading clips...');

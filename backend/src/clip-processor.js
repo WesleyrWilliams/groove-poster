@@ -11,6 +11,7 @@ import { getVideoDetails } from './youtube-fetcher.js';
 import { getTranscript } from './transcript-api.js';
 import { generateVideoAnalysis } from './openrouter.js';
 import { uploadToYouTubeShorts } from './trending-workflow.js';
+import { addLog } from './workflow-logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -25,36 +26,35 @@ const LOGO_PATH = path.join(__dirname, '../logo.png');
  * @returns {Promise<object>} Processing results
  */
 export async function process5ClipsFromVideo(videoUrl, options = {}) {
+  const { uploadToYouTube = false, watermarkPath = LOGO_PATH, workflowId = null } = options;
+  
   try {
-    console.log('\n╔═══════════════════════════════════════════════════════════╗');
-    console.log('║   🎬 PROCESSING 5 CLIPS FROM VIDEO                        ║');
-    console.log('╚═══════════════════════════════════════════════════════════╝\n');
-    
-    const { uploadToYouTube = false, watermarkPath = LOGO_PATH } = options;
-    
     // Extract video ID
     const videoIdMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
     const videoId = videoIdMatch ? videoIdMatch[1] : videoUrl.split('v=')[1]?.split('&')[0] || videoUrl;
     
-    console.log(`📹 Video ID: ${videoId}`);
-    console.log(`🎨 Logo: ${watermarkPath}\n`);
-    
     // Step 1: Get video details
-    console.log('📊 Step 1: Fetching video details...');
+    addLog('📊 Fetching video details...', 'search', workflowId);
     const details = await getVideoDetails(videoId);
-    console.log(`✅ Video: "${details.title}"`);
-    console.log(`   Views: ${parseInt(details.viewCount || 0).toLocaleString()}`);
-    console.log(`   Duration: ${details.duration}s\n`);
+    addLog(`✅ Found: "${details.title}"`, 'success', workflowId);
     
     // Step 2: Get transcript
-    console.log('📝 Step 2: Fetching transcript...');
-    let transcript = await getTranscript(videoId);
+    addLog('📝 Getting transcript...', 'transcribe', workflowId);
+    let transcript = [];
+    try {
+      transcript = await getTranscript(videoId);
+      if (transcript.length > 0) {
+        addLog(`✅ Got ${transcript.length} transcript segments`, 'success', workflowId);
+      }
+    } catch (error) {
+      addLog(`⚠️ Transcript fetch failed: ${error.message}`, 'processing', workflowId);
+    }
     
     let clipsToProcess = [];
     let analysis = {};
     
     if (transcript.length === 0) {
-      console.log('⚠️ No YouTube transcript available, using fallback: create 5 clips from video timeline\n');
+      addLog('⚠️ No transcript available, using fallback: create 5 clips from timeline', 'processing', workflowId);
       
       // Fallback: Create 5 clips evenly distributed across the video
       const videoDuration = details.duration || 600;
@@ -90,11 +90,9 @@ export async function process5ClipsFromVideo(videoUrl, options = {}) {
       console.log(`✅ Got ${transcript.length} transcript segments\n`);
       
       // Step 3: AI Analysis to find best clips
-      console.log('🤖 Step 3: Analyzing video with AI for best clips...');
+      addLog('🤖 Analyzing video with AI for best clips...', 'processing', workflowId);
       analysis = await generateVideoAnalysis(details, transcript);
-      console.log(`✅ Analysis complete:`);
-      console.log(`   Reason: ${analysis.reason || 'N/A'}`);
-      console.log(`   Clips found: ${analysis.clips?.length || 0}\n`);
+      addLog(`✅ AI analysis complete: Found ${analysis.clips?.length || 0} clips`, 'success', workflowId);
       
       // Get top 5 clips
       clipsToProcess = (analysis.clips || []).slice(0, 5);
@@ -115,7 +113,7 @@ export async function process5ClipsFromVideo(videoUrl, options = {}) {
       }
     }
     
-    console.log(`🎬 Step 4: Processing ${clipsToProcess.length} clips...\n`);
+    addLog(`✂️ Processing ${clipsToProcess.length} clips...`, 'clip', workflowId);
     
     const processedClips = [];
     
@@ -124,23 +122,13 @@ export async function process5ClipsFromVideo(videoUrl, options = {}) {
       const clip = clipsToProcess[i];
       const clipNumber = i + 1;
       
-      console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      console.log(`📹 CLIP ${clipNumber}/${clipsToProcess.length}`);
-      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-      
       const startTime = clip.startSeconds || clip.start || 0;
       const endTime = clip.endSeconds || clip.end || 30;
       const duration = Math.min(Math.max(endTime - startTime, 15), 60);
       
-      console.log(`   Start: ${startTime}s`);
-      console.log(`   End: ${endTime}s`);
-      console.log(`   Duration: ${duration}s`);
-      console.log(`   Reason: ${clip.reason || 'N/A'}`);
-      console.log(`   Title: ${analysis.title || 'Viral Moment'}\n`);
+      addLog(`✂️ Clipping video ${clipNumber}/${clipsToProcess.length} (${startTime}s-${endTime}s)...`, 'clip', workflowId);
       
       try {
-        console.log(`   🎬 Processing clip ${clipNumber}...`);
-        
         const result = await processVideoToShort(
           details.url,
           startTime,
@@ -185,7 +173,7 @@ export async function process5ClipsFromVideo(videoUrl, options = {}) {
       
       for (let i = 0; i < processedClips.length; i++) {
         const clip = processedClips[i];
-        console.log(`\n📤 Uploading clip ${clip.clipNumber}/${processedClips.length}...`);
+        addLog(`📤 Uploading clip ${clipNumber}/${processedClips.length} to YouTube...`, 'upload', workflowId);
         console.log(`   Title: ${clip.title}`);
         console.log(`   Path: ${clip.videoPath}\n`);
         

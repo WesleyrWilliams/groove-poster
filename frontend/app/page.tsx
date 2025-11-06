@@ -31,6 +31,7 @@ const GrooveSznDashboard = () => {
   const [nextRunTime, setNextRunTime] = useState(3600)
   const [flowStep, setFlowStep] = useState(-1) // -1 means not running
   const [isFlowRunning, setIsFlowRunning] = useState(false)
+  const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null)
   
   // Video processing state
   const [videoUrl, setVideoUrl] = useState('')
@@ -156,36 +157,105 @@ const GrooveSznDashboard = () => {
     return `${hrs}h ${mins}m ${secs}s`
   }
 
-  const addLog = (message: string, type: LogEntry['type'] = 'processing') => {
-    const newLog: LogEntry = {
-      id: Date.now(),
-      message,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type
+  // Fetch logs from backend
+  const fetchLogs = async (workflowId: string | null = null) => {
+    try {
+      const params = new URLSearchParams()
+      if (workflowId) params.append('workflowId', workflowId)
+      params.append('limit', '100')
+      
+      const response = await axios.get(`${backendUrl}/api/logs?${params.toString()}`)
+      const fetchedLogs = response.data.logs || []
+      
+      // Convert backend log format to frontend format
+      const formattedLogs: LogEntry[] = fetchedLogs.map((log: any) => ({
+        id: log.id,
+        message: log.message,
+        time: log.time || new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: log.type || 'processing'
+      }))
+      
+      setLogs(formattedLogs)
+      return formattedLogs
+    } catch (error) {
+      console.error('Error fetching logs:', error)
+      return []
     }
-    setLogs(prev => [newLog, ...prev].slice(0, 50)) // Keep last 50 logs
   }
+
+  // Poll for logs when workflow is running
+  useEffect(() => {
+    if (!currentWorkflowId || !isFlowRunning) return
+    
+    // Fetch logs immediately
+    fetchLogs(currentWorkflowId)
+    
+    // Poll every 2 seconds while workflow is running
+    const interval = setInterval(() => {
+      fetchLogs(currentWorkflowId).then((newLogs) => {
+        // Update flow step based on log types
+        const hasSearch = newLogs.some(log => log.type === 'search')
+        const hasClip = newLogs.some(log => log.message.includes('clip') || log.message.includes('Clipping'))
+        const hasTranscribe = newLogs.some(log => log.type === 'transcribe')
+        const hasUpload = newLogs.some(log => log.type === 'upload')
+        const hasComplete = newLogs.some(log => log.type === 'complete' || log.type === 'success')
+        
+        let step = -1
+        if (hasComplete) step = 4
+        else if (hasUpload) step = 3
+        else if (hasTranscribe) step = 2
+        else if (hasClip) step = 1
+        else if (hasSearch) step = 0
+        
+        setFlowStep(step)
+        
+        // Check if workflow is complete
+        if (hasComplete || newLogs.some(log => log.type === 'error' && log.message.includes('completed'))) {
+          setIsFlowRunning(false)
+        }
+      })
+    }, 2000)
+    
+    return () => clearInterval(interval)
+  }, [currentWorkflowId, isFlowRunning, backendUrl])
+
+  // Fetch all logs on mount and periodically
+  useEffect(() => {
+    fetchLogs()
+    const interval = setInterval(() => {
+      if (!isFlowRunning) {
+        fetchLogs()
+      }
+    }, 10000) // Refresh every 10 seconds when not running
+    return () => clearInterval(interval)
+  }, [backendUrl, isFlowRunning])
 
   const triggerFlowNow = async () => {
     setIsProcessing(true)
     setIsFlowRunning(true)
     setFlowStep(0)
-    addLog('🚀 Manual trigger initiated...', 'trigger')
 
     try {
       if (videoUrl) {
-        addLog(`📹 Processing video: ${videoUrl}`, 'search')
-        await axios.post(`${backendUrl}/api/process-video`, { videoUrl })
-        addLog(`✅ Video processing started successfully`, 'success')
+        const response = await axios.post(`${backendUrl}/api/process-video`, { videoUrl })
+        const workflowId = response.data.workflowId
+        if (workflowId) {
+          setCurrentWorkflowId(workflowId)
+        }
       } else if (channelId) {
-        addLog(`📺 Processing channel: ${channelId}`, 'search')
-        await axios.post(`${backendUrl}/api/process-channel`, { channelId })
-        addLog(`✅ Channel processing started successfully`, 'success')
+        const response = await axios.post(`${backendUrl}/api/process-channel`, { channelId })
+        const workflowId = response.data.workflowId
+        if (workflowId) {
+          setCurrentWorkflowId(workflowId)
+        }
       } else {
-        addLog('⚠️ Please enter a video URL or channel ID', 'error')
+        setIsFlowRunning(false)
+        setFlowStep(-1)
+        alert('⚠️ Please enter a video URL or channel ID')
+        return
       }
       
-      // Refresh stats after processing
+      // Refresh stats after processing starts
       setTimeout(async () => {
         try {
           const response = await axios.get(`${backendUrl}/api/stats`)
@@ -196,9 +266,9 @@ const GrooveSznDashboard = () => {
       }, 2000)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      addLog(`❌ Error: ${errorMessage}`, 'error')
       setIsFlowRunning(false)
       setFlowStep(-1)
+      alert(`❌ Error: ${errorMessage}`)
     } finally {
       setIsProcessing(false)
     }
@@ -206,14 +276,13 @@ const GrooveSznDashboard = () => {
 
   const process5ClipsAndUpload = async () => {
     if (!clipVideoUrl) {
-      addLog('❌ Please enter a YouTube video URL', 'error')
+      alert('❌ Please enter a YouTube video URL')
       return
     }
 
     setIsProcessingClips(true)
     setIsFlowRunning(true)
     setFlowStep(0)
-    addLog(`🎬 Starting 5-clip processing for: ${clipVideoUrl}`, 'trigger')
 
     try {
       // Extract video ID from URL
@@ -223,26 +292,6 @@ const GrooveSznDashboard = () => {
       if (!videoId) {
         throw new Error('Invalid YouTube URL')
       }
-
-      // Simulate progress
-      const progressSteps: Array<{ step: number, message: string, type: LogEntry['type'] }> = [
-        { step: 0, message: '📊 Fetching video details...', type: 'search' },
-        { step: 1, message: '📝 Getting transcript...', type: 'processing' },
-        { step: 2, message: '🤖 AI analyzing for best clips...', type: 'processing' },
-        { step: 3, message: '✂️ Creating 5 clips (30s each)...', type: 'processing' },
-        { step: 4, message: '🎨 Processing with 9:16 layout + logo...', type: 'processing' }
-      ]
-
-      if (uploadEnabled) {
-        progressSteps.push({ step: 4, message: '📤 Uploading clips to YouTube Shorts...', type: 'upload' })
-      }
-
-      progressSteps.forEach((step, idx) => {
-        setTimeout(() => {
-          setFlowStep(step.step)
-          addLog(step.message, step.type)
-        }, idx * 2000)
-      })
 
       // Call 5-clip processing API
       const response = await axios.post(
@@ -257,32 +306,33 @@ const GrooveSznDashboard = () => {
         }
       )
 
-      setTimeout(() => {
-        setFlowStep(4)
-        addLog(`✅ Workflow started! Processing 5 clips${uploadEnabled ? ' and uploading to YouTube' : ''}...`, 'success')
-        addLog('📝 Check Vercel logs for detailed progress. Clips will appear in your YouTube channel when ready.', 'processing')
-        setIsFlowRunning(false)
-        
-        // Refresh stats and library
-        setTimeout(async () => {
-          try {
-            const [statsRes, libRes] = await Promise.all([
-              axios.get(`${backendUrl}/api/stats`),
-              axios.get(`${backendUrl}/api/content-library`)
-            ])
-            setStats(statsRes.data)
-            setContentLibrary(libRes.data)
-          } catch (e) {
-            console.error('Error refreshing data:', e)
-          }
-        }, 3000)
-      }, progressSteps.length * 2000)
+      const workflowId = response.data.workflowId
+      if (workflowId) {
+        setCurrentWorkflowId(workflowId)
+      }
+      
+      // Refresh stats and library periodically
+      const refreshInterval = setInterval(async () => {
+        try {
+          const [statsRes, libRes] = await Promise.all([
+            axios.get(`${backendUrl}/api/stats`),
+            axios.get(`${backendUrl}/api/content-library`)
+          ])
+          setStats(statsRes.data)
+          setContentLibrary(libRes.data)
+        } catch (e) {
+          console.error('Error refreshing data:', e)
+        }
+      }, 10000)
+      
+      // Clear interval after 5 minutes
+      setTimeout(() => clearInterval(refreshInterval), 300000)
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      addLog(`❌ Error: ${errorMessage}`, 'error')
       setIsFlowRunning(false)
       setFlowStep(-1)
+      alert(`❌ Error: ${errorMessage}`)
     } finally {
       setIsProcessingClips(false)
     }
@@ -303,9 +353,9 @@ const GrooveSznDashboard = () => {
       // Save to backend
       await axios.post(`${backendUrl}/api/automation-settings`, settings)
       
-      addLog('✅ Settings saved successfully', 'success')
+      alert('✅ Settings saved successfully')
     } catch (error) {
-      addLog(`❌ Error saving settings: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+      alert(`❌ Error saving settings: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -314,7 +364,6 @@ const GrooveSznDashboard = () => {
     
     // In a real app, this would call an API to delete
     setContentLibrary(prev => prev.filter(v => v.id !== videoId))
-    addLog(`🗑️ Video deleted`, 'processing')
   }
 
   const StatCard = ({ icon: Icon, title, value, subtitle }: { icon: React.ElementType, title: string, value: string | number, subtitle: string }) => (

@@ -124,6 +124,25 @@ app.get('/terms', (req, res) => {
   `);
 });
 
+// Get workflow logs endpoint
+app.get('/api/logs', async (req, res) => {
+  try {
+    const { workflowId, type, limit = 100 } = req.query;
+    const { getLogs } = await import('./src/workflow-logger.js');
+    
+    const logs = getLogs({
+      workflowId: workflowId || null,
+      type: type || null,
+      limit: parseInt(limit)
+    });
+    
+    res.json({ logs });
+  } catch (error) {
+    console.error('Error fetching logs:', error);
+    res.status(500).json({ error: 'Failed to fetch logs' });
+  }
+});
+
 // Process single video
 app.post('/api/process-video', async (req, res) => {
   try {
@@ -133,21 +152,30 @@ app.post('/api/process-video', async (req, res) => {
       return res.status(400).json({ error: 'videoUrl is required' });
     }
 
+    const { addLog } = await import('./src/workflow-logger.js');
+    const workflowId = `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     // Return immediately - process in background
     res.json({
       success: true,
       message: 'Video processing started (FREE AI-powered)',
       note: 'Processing in background - check logs for progress',
-      videoUrl
+      videoUrl,
+      workflowId
     });
     
     // Process asynchronously after response is sent
     setImmediate(async () => {
       try {
-        console.log(`\n🚀 Processing video in background: ${videoUrl}`);
-        const result = await processVideoWithFreeTools(videoUrl);
-        console.log('✅ Video processed successfully:', result);
+        addLog(`🚀 Manual trigger initiated...`, 'trigger', workflowId);
+        addLog(`📹 Processing video: ${videoUrl}`, 'processing', workflowId);
+        
+        const result = await processVideoWithFreeTools(videoUrl, { workflowId });
+        
+        addLog(`✅ Video processing completed successfully`, 'success', workflowId);
       } catch (err) {
+        const { addLog } = await import('./src/workflow-logger.js');
+        addLog(`❌ Video processing failed: ${err.message}`, 'error', workflowId);
         console.error('❌ Video processing failed:', err.message);
         console.error(err.stack);
       }
@@ -423,25 +451,42 @@ app.post('/api/process-5-clips', async (req, res) => {
       return res.status(400).json({ error: 'videoUrl is required' });
     }
     
-    console.log(`\n🎬 Processing 5 clips from video...`);
-    console.log(`   Video URL: ${videoUrl}`);
-    console.log(`   Upload to YouTube: ${uploadToYouTube}\n`);
+    const { addLog } = await import('./src/workflow-logger.js');
+    const workflowId = `clips-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Import test script function
-    const { process5ClipsFromVideo } = await import('./src/clip-processor.js');
+    // Return immediately
+    res.json({
+      success: true,
+      message: '5-clip processing started',
+      note: 'Processing in background - check logs for progress',
+      videoUrl,
+      workflowId
+    });
     
     // Run processing asynchronously
-    process5ClipsFromVideo(videoUrl, {
-      uploadToYouTube,
-      watermarkPath: watermarkPath || './logo.png'
-    }).then(result => {
-      console.log('\n✅ 5-clip processing completed');
-      console.log(`   Processed: ${result.processedClips}/${result.totalClips} clips`);
-      if (uploadToYouTube) {
-        console.log(`   Uploaded: ${result.uploadedClips} clips to YouTube`);
+    setImmediate(async () => {
+      try {
+        addLog(`🎬 Starting 5-clip processing for: ${videoUrl}`, 'trigger', workflowId);
+        
+        const { process5ClipsFromVideo } = await import('./src/clip-processor.js');
+        
+        const result = await process5ClipsFromVideo(videoUrl, {
+          uploadToYouTube,
+          watermarkPath: watermarkPath || './logo.png',
+          workflowId
+        });
+        
+        addLog(`✅ 5-clip processing completed: ${result.processedClips}/${result.totalClips} clips`, 'success', workflowId);
+        if (uploadToYouTube && result.uploadedClips > 0) {
+          addLog(`📤 Uploaded ${result.uploadedClips} clips to YouTube`, 'upload', workflowId);
+        }
+        addLog(`🎉 Workflow complete!`, 'complete', workflowId);
+      } catch (err) {
+        const { addLog } = await import('./src/workflow-logger.js');
+        addLog(`❌ 5-clip processing failed: ${err.message}`, 'error', workflowId);
+        console.error('❌ 5-clip processing failed:', err.message);
+        console.error(err.stack);
       }
-    }).catch(err => {
-      console.error('❌ 5-clip processing failed:', err.message);
     });
     
     res.json({
