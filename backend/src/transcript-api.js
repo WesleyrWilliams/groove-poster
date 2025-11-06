@@ -1,9 +1,62 @@
 import axios from 'axios';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { generateSRTWithWhisperAPI } from './whisper-api.js';
 
-export async function getTranscript(videoId) {
+const execAsync = promisify(exec);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const TEMP_DIR = path.join(__dirname, '../../temp');
+
+// Ensure temp directory exists
+if (!fs.existsSync(TEMP_DIR)) {
+  fs.mkdirSync(TEMP_DIR, { recursive: true });
+}
+
+/**
+ * Find yt-dlp binary
+ */
+async function findYtDlp() {
   try {
-    // Try YouTube transcript API (free, no key needed)
-    // Try multiple languages in order
+    await execAsync('which yt-dlp');
+    return 'yt-dlp';
+  } catch {
+    // Try common paths
+    if (fs.existsSync('/Users/mac/Library/Python/3.9/bin/yt-dlp')) {
+      return '/Users/mac/Library/Python/3.9/bin/yt-dlp';
+    }
+    throw new Error('yt-dlp not found. Install via: brew install yt-dlp or pip install yt-dlp');
+  }
+}
+
+/**
+ * Extract audio from YouTube video using yt-dlp
+ * @param {string} videoUrl - YouTube video URL
+ * @param {string} outputPath - Output audio file path
+ * @returns {Promise<string>} Path to audio file
+ */
+async function extractAudio(videoUrl, outputPath) {
+  try {
+    console.log(`🎵 Extracting audio from: ${videoUrl}`);
+    
+    const ytDlp = await findYtDlp();
+    const command = `${ytDlp} -x --audio-format mp3 --audio-quality 0 -o "${outputPath}" "${videoUrl}"`;
+    
+    await execAsync(command);
+    console.log(`✅ Audio extracted: ${outputPath}`);
+    return outputPath;
+  } catch (error) {
+    console.error('❌ Error extracting audio:', error.message);
+    throw error;
+  }
+}
+
+export async function getTranscript(videoId, videoUrl = null) {
+  try {
+    // Step 1: Try YouTube transcript API first (fastest, free)
     const languages = ['en', 'en-US', 'en-GB', 'auto'];
     
     for (const lang of languages) {
@@ -31,7 +84,7 @@ export async function getTranscript(videoId) {
             .filter(item => item.text.trim().length > 0);
           
           if (transcript.length > 0) {
-            console.log(`✅ Got transcript in ${lang} (${transcript.length} segments)`);
+            console.log(`✅ Got YouTube transcript in ${lang} (${transcript.length} segments)`);
             return transcript;
           }
         }
@@ -41,15 +94,99 @@ export async function getTranscript(videoId) {
       }
     }
     
-    // No transcript found in any language
-    throw new Error('No transcript available in any language');
+    // Step 2: Fallback to Whisper API (works on any video)
+    if (videoUrl) {
+      console.log('⚠️ No YouTube captions, using Whisper transcription...');
+      return await getTranscriptWithWhisper(videoUrl, videoId);
+    }
+    
+    // No video URL provided, can't use Whisper
+    throw new Error('No transcript available and no video URL for Whisper fallback');
   } catch (error) {
     console.error('Error fetching transcript:', error.message);
-    console.warn('⚠️ Note: Some videos don\'t have captions. Use a video with captions enabled, or the system will use timeline-based clips.');
+    console.warn('⚠️ Note: Transcript fetch failed. System will use timeline-based clips.');
     
-    // Fallback: Return empty transcript (will use timeline-based clips)
+    // Final fallback: Return empty transcript (will use timeline-based clips)
     return [];
   }
+}
+
+/**
+ * Get transcript using Whisper API (OpusAI-style)
+ * @param {string} videoUrl - YouTube video URL
+ * @param {string} videoId - Video ID for temp file naming
+ * @returns {Promise<Array>} Transcript array
+ */
+async function getTranscriptWithWhisper(videoUrl, videoId) {
+  const audioPath = path.join(TEMP_DIR, `${videoId}_audio.mp3`);
+  const srtPath = path.join(TEMP_DIR, `${videoId}_transcript.srt`);
+  
+  try {
+    // Step 1: Extract audio
+    await extractAudio(videoUrl, audioPath);
+    
+    // Step 2: Transcribe with Whisper API
+    await generateSRTWithWhisperAPI(audioPath, srtPath);
+    
+    // Step 3: Parse SRT to transcript format
+    const srtContent = fs.readFileSync(srtPath, 'utf8');
+    const transcript = parseSRTToTranscript(srtContent);
+    
+    // Cleanup audio file (keep SRT for potential reuse)
+    if (fs.existsSync(audioPath)) {
+      fs.unlinkSync(audioPath);
+    }
+    
+    console.log(`✅ Whisper transcription complete (${transcript.length} segments)`);
+    return transcript;
+  } catch (error) {
+    // Cleanup on error
+    if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+    throw error;
+  }
+}
+
+/**
+ * Parse SRT content to transcript format
+ * @param {string} srtContent - SRT file content
+ * @returns {Array} Transcript array with {text, start, duration}
+ */
+function parseSRTToTranscript(srtContent) {
+  const transcript = [];
+  const blocks = srtContent.split('\n\n').filter(block => block.trim());
+  
+  for (const block of blocks) {
+    const lines = block.split('\n').filter(line => line.trim());
+    if (lines.length < 2) continue;
+    
+    // Skip index line, parse timestamp line
+    const timeLine = lines[1];
+    const timeMatch = timeLine.match(/(\d{2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2}),(\d{3})/);
+    if (!timeMatch) continue;
+    
+    const startHours = parseInt(timeMatch[1]);
+    const startMinutes = parseInt(timeMatch[2]);
+    const startSeconds = parseInt(timeMatch[3]);
+    const startMs = parseInt(timeMatch[4]);
+    const start = startHours * 3600 + startMinutes * 60 + startSeconds + startMs / 1000;
+    
+    const endHours = parseInt(timeMatch[5]);
+    const endMinutes = parseInt(timeMatch[6]);
+    const endSeconds = parseInt(timeMatch[7]);
+    const endMs = parseInt(timeMatch[8]);
+    const end = endHours * 3600 + endMinutes * 60 + endSeconds + endMs / 1000;
+    
+    const text = lines.slice(2).join(' ').trim();
+    if (text) {
+      transcript.push({
+        text,
+        start,
+        duration: end - start
+      });
+    }
+  }
+  
+  return transcript;
 }
 
 export async function getBestMoments(transcript, numClips = 3) {

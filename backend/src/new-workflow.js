@@ -70,11 +70,11 @@ export async function processVideoWithFreeTools(videoUrl, options = {}) {
       };
     }
     
-    // Step 2: Get transcript (free)
+    // Step 2: Get transcript (OpusAI-style: YouTube → Whisper fallback)
     let transcript = [];
     try {
-      addLog('📝 Getting transcript...', 'transcribe', workflowId);
-      transcript = await getTranscript(videoId);
+      addLog('📝 Getting transcript (OpusAI-style)...', 'transcribe', workflowId);
+      transcript = await getTranscript(videoId, videoUrl);
       
       if (!transcript || transcript.length === 0) {
         addLog('⚠️ No transcript available, continuing with minimal processing', 'processing', workflowId);

@@ -22,6 +22,11 @@ export async function saveToGoogleSheets(data) {
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
     const sheetName = 'GrooveSzn Auto Clipper';
     
+    // Deep logging with metadata (OpusAI-style)
+    const timestamp = new Date().toISOString();
+    const clipData = data.clips || [];
+    const firstClip = clipData[0] || {};
+    
     await client.spreadsheets.values.append({
       spreadsheetId,
       range: `${sheetName}!A:O`,
@@ -31,14 +36,14 @@ export async function saveToGoogleSheets(data) {
           data.videoId || '',
           data.projectId || '',
           data.videoUrl || '',
-          data.videoMsDuration || '',
+          data.videoMsDuration || data.duration || '',
           data.title || '',
           data.transcript || '',
-          data.viralScore || '',
-          data.viralReason || '',
-          data.relatedTopic || '',
+          firstClip.trend_score || data.viralScore || '',
+          data.viralReason || firstClip.reason || '',
+          data.relatedTopic || data.hashtags?.join(', ') || '',
           data.clipEditorUrl || '',
-          data.generatedCaption || '',
+          data.generatedCaption || data.subtitle || '',
           data.tiktokUploadStatus || 'pending',
           data.instagramUploadStatus || 'pending',
           data.youtubeUploadStatus || 'pending',
@@ -47,7 +52,12 @@ export async function saveToGoogleSheets(data) {
       },
     });
     
-    console.log('Saved to Google Sheets');
+    // Log additional metadata if available
+    if (clipData.length > 0) {
+      console.log(`📊 Logged to Sheets: ${clipData.length} clips, trend_score: ${firstClip.trend_score || 'N/A'}, emotion: ${firstClip.emotion || 'N/A'}`);
+    } else {
+      console.log('📊 Saved to Google Sheets');
+    }
   } catch (error) {
     console.error('Error saving to Google Sheets:', error.message);
     // Don't throw - allow workflow to continue even if Sheets fails

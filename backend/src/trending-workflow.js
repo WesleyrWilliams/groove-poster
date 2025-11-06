@@ -381,14 +381,15 @@ export async function extractBestClip(videoId, processVideo = false, options = {
   try {
     console.log(`🎬 Extracting best clip from ${videoId}...`);
     
-    // Get transcript
-    const transcript = await getTranscript(videoId);
+    // Get video details first (needed for URL)
+    const details = await getVideoDetails(videoId);
+    
+    // Get transcript (OpusAI-style: YouTube → Whisper fallback)
+    const videoUrl = details.url || `https://www.youtube.com/watch?v=${videoId}`;
+    const transcript = await getTranscript(videoId, videoUrl);
     if (transcript.length === 0) {
       throw new Error('No transcript available');
     }
-    
-    // Get video details
-    const details = await getVideoDetails(videoId);
     
     // Use enhanced AI analysis to get title, timestamps, and hashtags
     console.log(`🤖 Analyzing video with AI for best clip...`);
@@ -425,6 +426,7 @@ export async function extractBestClip(videoId, processVideo = false, options = {
       ? analysis.clips[0] 
       : { startSeconds: 0, endSeconds: 30, reason: 'Default clip' };
     
+    // OpusAI-style clip data with trend scoring
     const clipData = {
       videoId,
       videoUrl: details.url,
@@ -436,7 +438,12 @@ export async function extractBestClip(videoId, processVideo = false, options = {
       subtitle: analysis.subtitle || '',
       reason: analysis.reason || bestClip.reason || 'AI-selected engaging moment',
       title: analysis.title || details.title || 'Viral Moment',
-      hashtags: analysis.hashtags || ['#viral', '#shorts', '#trending']
+      hashtags: analysis.hashtags || ['#viral', '#shorts', '#trending'],
+      // OpusAI-style metadata
+      trend_score: bestClip.trend_score || 7.0,
+      emotion: bestClip.emotion || 'engagement',
+      engagement_cues: bestClip.engagement_cues || ['viral', 'trending'],
+      clips: analysis.clips || [] // Store all clips for logging
     };
     
     // If processVideo is true, process with enhanced video processor

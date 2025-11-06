@@ -75,20 +75,21 @@ async function testGetVideoDetails(videoId) {
   }
 }
 
-// === STEP 3: TRANSCRIBE ===
-async function testTranscription(videoId) {
-  logStep("Whisper Transcription", "Started");
+// === STEP 3: TRANSCRIBE (OpusAI-style) ===
+async function testTranscription(videoId, videoUrl) {
+  logStep("Transcription (OpusAI-style)", "Started");
   try {
-    const transcript = await getTranscript(videoId);
+    // Try YouTube captions first, then Whisper fallback
+    const transcript = await getTranscript(videoId, videoUrl);
     if (!transcript || transcript.length === 0) {
-      logStep("Whisper Transcription", "No Transcript", "Video has no transcript, will use fallback");
+      logStep("Transcription", "No Transcript", "Video has no transcript, will use fallback");
       return []; // Return empty array instead of throwing
     }
     const textSnippet = transcript.slice(0, 3).map(t => t.text).join(' ');
-    logStep("Whisper Transcription", "Success", `Got ${transcript.length} segments: "${textSnippet.substring(0, 100)}..."`);
+    logStep("Transcription", "Success", `Got ${transcript.length} segments: "${textSnippet.substring(0, 100)}..."`);
     return transcript;
   } catch (error) {
-    logStep("Whisper Transcription", "Failed", error.message + " - will use fallback");
+    logStep("Transcription", "Failed", error.message + " - will use fallback");
     return []; // Return empty array instead of throwing
   }
 }
@@ -166,21 +167,30 @@ async function testUploadToYouTube(clipResult, analysis) {
   }
 }
 
-// === STEP 7: LOG TO GOOGLE SHEET ===
+// === STEP 7: DEEP LOG TO GOOGLE SHEET (OpusAI-style) ===
 async function testGoogleSheet(videoId, videoDetails, analysis) {
-  logStep("Google Sheet Log", "Started");
+  logStep("Google Sheet Log (Deep Metadata)", "Started");
   try {
+    const firstClip = analysis.clips?.[0] || {};
     await saveToGoogleSheets({
       videoId: videoId || 'test-' + Date.now(),
       videoUrl: videoDetails.url || '',
       title: analysis.title || videoDetails.title || 'Test Video',
+      subtitle: analysis.subtitle || '',
       transcript: '',
-      viralReason: analysis.reason || 'Test',
+      viralReason: analysis.reason || firstClip.reason || 'Test',
+      viralScore: firstClip.trend_score || 0,
       relatedTopic: analysis.hashtags?.join(', ') || '',
       generatedCaption: analysis.subtitle || '',
-      youtubeUploadStatus: videoId ? 'uploaded' : 'pending'
+      clips: analysis.clips || [],
+      duration: videoDetails.duration || 0,
+      youtubeUploadStatus: videoId ? 'uploaded' : 'pending',
+      tiktokUploadStatus: 'pending',
+      instagramUploadStatus: 'pending',
+      facebookUploadStatus: 'pending'
     });
-    logStep("Google Sheet Log", "Success", "Logged to Google Sheets");
+    logStep("Google Sheet Log", "Success", 
+      `Logged: ${analysis.clips?.length || 0} clips, trend_score: ${firstClip.trend_score || 'N/A'}, emotion: ${firstClip.emotion || 'N/A'}`);
   } catch (error) {
     logStep("Google Sheet Log", "Failed", error.message);
     // Don't throw - logging failure shouldn't fail the test
@@ -216,8 +226,8 @@ async function runFullPipelineTest() {
     // Step 2: Get Video Details
     videoDetails = await testGetVideoDetails(videoId);
     
-    // Step 3: Transcribe
-    transcript = await testTranscription(videoId);
+    // Step 3: Transcribe (OpusAI-style: YouTube → Whisper)
+    transcript = await testTranscription(videoId, videoDetails.url || trendingVideo.url);
     
     // Step 4: AI Highlight Detection
     if (transcript && transcript.length > 0) {
