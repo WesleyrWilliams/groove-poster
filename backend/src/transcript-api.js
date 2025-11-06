@@ -3,35 +3,51 @@ import axios from 'axios';
 export async function getTranscript(videoId) {
   try {
     // Try YouTube transcript API (free, no key needed)
-    const response = await axios.get(
-      `https://www.youtube.com/api/timedtext`,
-      {
-        params: {
-          v: videoId,
-          lang: 'en',
-          fmt: 'json3',
-        },
-      }
-    );
+    // Try multiple languages in order
+    const languages = ['en', 'en-US', 'en-GB', 'auto'];
     
-    if (response.data && response.data.events) {
-      const transcript = response.data.events
-        .filter(event => event.segs)
-        .map(event => ({
-          text: event.segs.map(seg => seg.utf8).join(''),
-          start: event.tStartMs / 1000,
-          duration: event.dDurationMs / 1000,
-        }))
-        .filter(item => item.text.trim().length > 0);
-      
-      return transcript;
+    for (const lang of languages) {
+      try {
+        const response = await axios.get(
+          `https://www.youtube.com/api/timedtext`,
+          {
+            params: {
+              v: videoId,
+              lang: lang,
+              fmt: 'json3',
+            },
+            timeout: 10000,
+          }
+        );
+        
+        if (response.data && response.data.events) {
+          const transcript = response.data.events
+            .filter(event => event.segs)
+            .map(event => ({
+              text: event.segs.map(seg => seg.utf8).join(''),
+              start: event.tStartMs / 1000,
+              duration: event.dDurationMs / 1000,
+            }))
+            .filter(item => item.text.trim().length > 0);
+          
+          if (transcript.length > 0) {
+            console.log(`✅ Got transcript in ${lang} (${transcript.length} segments)`);
+            return transcript;
+          }
+        }
+      } catch (langError) {
+        // Try next language
+        continue;
+      }
     }
     
-    throw new Error('No transcript available');
+    // No transcript found in any language
+    throw new Error('No transcript available in any language');
   } catch (error) {
     console.error('Error fetching transcript:', error.message);
+    console.warn('⚠️ Note: Some videos don\'t have captions. Use a video with captions enabled, or the system will use timeline-based clips.');
     
-    // Fallback: Return empty transcript
+    // Fallback: Return empty transcript (will use timeline-based clips)
     return [];
   }
 }
