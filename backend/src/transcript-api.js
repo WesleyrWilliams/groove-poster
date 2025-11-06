@@ -9,11 +9,21 @@ import { generateSRTWithWhisperAPI } from './whisper-api.js';
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const TEMP_DIR = path.join(__dirname, '../../temp');
 
-// Ensure temp directory exists
-if (!fs.existsSync(TEMP_DIR)) {
-  fs.mkdirSync(TEMP_DIR, { recursive: true });
+// Use /tmp on Vercel (serverless), or relative temp directory locally
+let TEMP_DIR = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME 
+  ? '/tmp'  // Vercel/Lambda writable directory
+  : path.join(__dirname, '../../temp');  // Local development
+
+// Ensure temp directory exists (only if not /tmp - /tmp always exists on Vercel)
+if (TEMP_DIR !== '/tmp' && !fs.existsSync(TEMP_DIR)) {
+  try {
+    fs.mkdirSync(TEMP_DIR, { recursive: true });
+  } catch (error) {
+    // If mkdir fails, fallback to /tmp
+    console.warn(`⚠️ Could not create ${TEMP_DIR}, using /tmp instead`);
+    TEMP_DIR = '/tmp';
+  }
 }
 
 /**

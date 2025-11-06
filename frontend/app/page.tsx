@@ -525,34 +525,34 @@ const GrooveSznDashboard = () => {
             </div>
 
             {(isFlowRunning || flowStep >= 0) && (
-              <div className="bg-white rounded-xl p-6 shadow-md border border-blue-100">
-                <h3 className="text-lg font-semibold text-gray-800 mb-6">Current Flow Progress</h3>
-                <div className="flex items-center justify-between mb-4">
-                  {flowSteps.map((step, idx) => (
-                    <React.Fragment key={idx}>
-                      <div className="flex flex-col items-center">
-                        <div
-                          className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all ${
+            <div className="bg-white rounded-xl p-6 shadow-md border border-blue-100">
+              <h3 className="text-lg font-semibold text-gray-800 mb-6">Current Flow Progress</h3>
+              <div className="flex items-center justify-between mb-4">
+                {flowSteps.map((step, idx) => (
+                  <React.Fragment key={idx}>
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all ${
                             idx <= flowStep && flowStep >= 0 ? step.color : 'bg-gray-200'
                           } ${idx === flowStep && isFlowRunning ? 'scale-110 shadow-lg animate-pulse' : ''}`}
-                        >
-                          {step.icon}
-                        </div>
-                        <span className="text-xs font-medium text-gray-600 mt-2">{step.label}</span>
+                      >
+                        {step.icon}
                       </div>
-                      {idx < flowSteps.length - 1 && (
-                        <div className="flex-1 h-1 mx-2 bg-gray-200 rounded relative overflow-hidden">
-                          <div
-                            className={`absolute inset-0 bg-blue-500 transition-all duration-500 ${
+                      <span className="text-xs font-medium text-gray-600 mt-2">{step.label}</span>
+                    </div>
+                    {idx < flowSteps.length - 1 && (
+                      <div className="flex-1 h-1 mx-2 bg-gray-200 rounded relative overflow-hidden">
+                        <div
+                          className={`absolute inset-0 bg-blue-500 transition-all duration-500 ${
                               idx < flowStep && flowStep >= 0 ? 'w-full' : 'w-0'
-                            }`}
-                          ></div>
-                        </div>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </div>
+                          }`}
+                        ></div>
+                      </div>
+                    )}
+                  </React.Fragment>
+                ))}
               </div>
+            </div>
             )}
 
             <div className="bg-white rounded-xl p-6 shadow-md border border-blue-100">
@@ -576,23 +576,23 @@ const GrooveSznDashboard = () => {
                   <p className="text-center text-gray-400 py-8">No activity yet. Start a workflow to see logs.</p>
                 ) : (
                   logs.map(log => (
-                    <div
-                      key={log.id}
-                      className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex-shrink-0 mt-1">
-                        {log.type === 'success' && <CheckCircle className="text-green-500" size={20} />}
-                        {log.type === 'processing' && <RefreshCw className="text-blue-500 animate-spin" size={20} />}
-                        {log.type === 'search' && <TrendingUp className="text-purple-500" size={20} />}
-                        {log.type === 'upload' && <Upload className="text-orange-500" size={20} />}
-                        {log.type === 'trigger' && <Play className="text-blue-600" size={20} />}
-                        {log.type === 'error' && <AlertCircle className="text-red-500" size={20} />}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-700">{log.message}</p>
-                        <p className="text-xs text-gray-400 mt-1">{log.time}</p>
-                      </div>
+                  <div
+                    key={log.id}
+                    className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex-shrink-0 mt-1">
+                      {log.type === 'success' && <CheckCircle className="text-green-500" size={20} />}
+                      {log.type === 'processing' && <RefreshCw className="text-blue-500 animate-spin" size={20} />}
+                      {log.type === 'search' && <TrendingUp className="text-purple-500" size={20} />}
+                      {log.type === 'upload' && <Upload className="text-orange-500" size={20} />}
+                      {log.type === 'trigger' && <Play className="text-blue-600" size={20} />}
+                      {log.type === 'error' && <AlertCircle className="text-red-500" size={20} />}
                     </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-700">{log.message}</p>
+                      <p className="text-xs text-gray-400 mt-1">{log.time}</p>
+                    </div>
+                  </div>
                   ))
                 )}
               </div>
@@ -731,10 +731,10 @@ const GrooveSznDashboard = () => {
                 <p className="text-gray-500">No content found. Process some videos to see them here.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {contentLibrary.map(video => (
-                  <div key={video.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-blue-100">
-                    <div className="bg-gradient-to-br from-blue-100 to-purple-100 h-48 flex items-center justify-center text-6xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {contentLibrary.map(video => (
+                <div key={video.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-blue-100">
+                  <div className="bg-gradient-to-br from-blue-100 to-purple-100 h-48 flex items-center justify-center text-6xl">
                       {typeof video.thumbnail === 'string'
                         // thumbnail is probably a URL; render as image
                         ? <img
@@ -744,26 +744,26 @@ const GrooveSznDashboard = () => {
                             style={{ maxHeight: "11rem", maxWidth: '100%' }}
                           />
                         : video.thumbnail}
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">{video.title}</h3>
-                      <div className="flex items-center justify-between mb-3">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            video.status === 'Uploaded'
-                              ? 'bg-green-100 text-green-700'
-                              : video.status === 'Error'
-                              ? 'bg-red-100 text-red-700'
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">{video.title}</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          video.status === 'Uploaded'
+                            ? 'bg-green-100 text-green-700'
+                            : video.status === 'Error'
+                            ? 'bg-red-100 text-red-700'
                               : video.status === 'Processing'
                               ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          {video.status}
-                        </span>
-                        <span className="text-xs text-gray-500">{video.platform}</span>
-                      </div>
-                      <div className="flex space-x-2">
+                            : 'bg-blue-100 text-blue-700'
+                        }`}
+                      >
+                        {video.status}
+                      </span>
+                      <span className="text-xs text-gray-500">{video.platform}</span>
+                    </div>
+                    <div className="flex space-x-2">
                         {video.link && (
                           <a
                             href={video.link}
@@ -771,7 +771,7 @@ const GrooveSznDashboard = () => {
                             rel="noopener noreferrer"
                             className="flex-1 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium text-center"
                           >
-                            <Play size={16} className="inline mr-1" />
+                        <Play size={16} className="inline mr-1" />
                             View
                           </a>
                         )}
@@ -781,13 +781,13 @@ const GrooveSznDashboard = () => {
                           className="bg-red-50 text-red-600 p-2 rounded-lg hover:bg-red-100 transition-colors"
                           title="Delete"
                         >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
             )}
           </div>
         )}
@@ -846,9 +846,9 @@ const GrooveSznDashboard = () => {
                   <p className="text-center text-gray-400 py-8">No notifications yet.</p>
                 ) : (
                   logs.map(log => (
-                    <div key={log.id} className="p-3 bg-gray-50 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-                      <span className="font-medium">{log.time}</span> - {log.message}
-                    </div>
+                  <div key={log.id} className="p-3 bg-gray-50 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                    <span className="font-medium">{log.time}</span> - {log.message}
+                  </div>
                   ))
                 )}
               </div>
