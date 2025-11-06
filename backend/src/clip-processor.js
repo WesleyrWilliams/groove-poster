@@ -38,13 +38,15 @@ export async function process5ClipsFromVideo(videoUrl, options = {}) {
     const details = await getVideoDetails(videoId);
     addLog(`✅ Found: "${details.title}"`, 'success', workflowId);
     
-    // Step 2: Get transcript
-    addLog('📝 Getting transcript...', 'transcribe', workflowId);
+    // Step 2: Get transcript (OpusAI-style: YouTube → Whisper fallback)
+    addLog('📝 Getting transcript (OpusAI-style)...', 'transcribe', workflowId);
     let transcript = [];
     try {
-      transcript = await getTranscript(videoId);
+      transcript = await getTranscript(videoId, videoUrl);
       if (transcript.length > 0) {
         addLog(`✅ Got ${transcript.length} transcript segments`, 'success', workflowId);
+      } else {
+        addLog('⚠️ No transcript available, will use timeline-based clips', 'processing', workflowId);
       }
     } catch (error) {
       addLog(`⚠️ Transcript fetch failed: ${error.message}`, 'processing', workflowId);
