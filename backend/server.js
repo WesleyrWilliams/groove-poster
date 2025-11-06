@@ -127,8 +127,14 @@ app.get('/terms', (req, res) => {
 // Get workflow logs endpoint
 app.get('/api/logs', async (req, res) => {
   try {
-    const { workflowId, type, limit = 100 } = req.query;
-    const { getLogs } = await import('./src/workflow-logger.js');
+    const { workflowId, type, limit = 100, clear = false } = req.query;
+    const { getLogs, clearLogs } = await import('./src/workflow-logger.js');
+    
+    // Clear logs if requested
+    if (clear === 'true') {
+      clearLogs();
+      return res.json({ logs: [], message: 'Logs cleared' });
+    }
     
     const logs = getLogs({
       workflowId: workflowId || null,

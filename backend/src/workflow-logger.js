@@ -2,7 +2,7 @@
 // In production, this could be replaced with Redis, database, or file storage
 
 const logs = [];
-const MAX_LOGS = 1000; // Keep last 1000 logs
+const MAX_LOGS = 500; // Keep last 500 logs (reduced to clear old logs faster)
 
 /**
  * Add a log entry

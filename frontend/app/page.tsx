@@ -219,16 +219,19 @@ const GrooveSznDashboard = () => {
     return () => clearInterval(interval)
   }, [currentWorkflowId, isFlowRunning, backendUrl])
 
-  // Fetch all logs on mount and periodically
+  // Fetch all logs on mount and periodically (only if there are logs)
   useEffect(() => {
-    fetchLogs()
+    // Start with empty logs - only fetch if a workflow is running
+    setLogs([])
+    
     const interval = setInterval(() => {
-      if (!isFlowRunning) {
-        fetchLogs()
+      // Only fetch logs if a workflow is running or if we have a workflow ID
+      if (isFlowRunning || currentWorkflowId) {
+        fetchLogs(currentWorkflowId)
       }
-    }, 10000) // Refresh every 10 seconds when not running
+    }, 10000) // Refresh every 10 seconds when running
     return () => clearInterval(interval)
-  }, [backendUrl, isFlowRunning])
+  }, [backendUrl, isFlowRunning, currentWorkflowId])
 
   const triggerFlowNow = async () => {
     setIsProcessing(true)
@@ -567,45 +570,51 @@ const GrooveSznDashboard = () => {
               />
             </div>
 
-            {/* Flow Animation */}
-            <div className="bg-white rounded-xl p-6 shadow-md border border-blue-100">
-              <h3 className="text-lg font-semibold text-gray-800 mb-6">Current Flow Progress</h3>
-              <div className="flex items-center justify-between mb-4">
-                {flowSteps.map((step, idx) => (
-                  <React.Fragment key={idx}>
-                    <div className="flex flex-col items-center">
-                      <div
-                        className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all ${
-                          idx <= flowStep && flowStep >= 0 ? step.color : 'bg-gray-200'
-                        } ${idx === flowStep ? 'scale-110 shadow-lg animate-pulse' : ''}`}
-                      >
-                        {step.icon}
-                      </div>
-                      <span className="text-xs font-medium text-gray-600 mt-2">{step.label}</span>
-                    </div>
-                    {idx < flowSteps.length - 1 && (
-                      <div className="flex-1 h-1 mx-2 bg-gray-200 rounded relative overflow-hidden">
+            {/* Flow Animation - Only show when workflow is running */}
+            {(isFlowRunning || flowStep >= 0) && (
+              <div className="bg-white rounded-xl p-6 shadow-md border border-blue-100">
+                <h3 className="text-lg font-semibold text-gray-800 mb-6">Current Flow Progress</h3>
+                <div className="flex items-center justify-between mb-4">
+                  {flowSteps.map((step, idx) => (
+                    <React.Fragment key={idx}>
+                      <div className="flex flex-col items-center">
                         <div
-                          className={`absolute inset-0 bg-blue-500 transition-all duration-500 ${
-                            idx < flowStep && flowStep >= 0 ? 'w-full' : 'w-0'
-                          }`}
-                        ></div>
+                          className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all ${
+                            idx <= flowStep && flowStep >= 0 ? step.color : 'bg-gray-200'
+                          } ${idx === flowStep && isFlowRunning ? 'scale-110 shadow-lg animate-pulse' : ''}`}
+                        >
+                          {step.icon}
+                        </div>
+                        <span className="text-xs font-medium text-gray-600 mt-2">{step.label}</span>
                       </div>
-                    )}
-                  </React.Fragment>
-                ))}
+                      {idx < flowSteps.length - 1 && (
+                        <div className="flex-1 h-1 mx-2 bg-gray-200 rounded relative overflow-hidden">
+                          <div
+                            className={`absolute inset-0 bg-blue-500 transition-all duration-500 ${
+                              idx < flowStep && flowStep >= 0 ? 'w-full' : 'w-0'
+                            }`}
+                          ></div>
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
               </div>
-              {flowStep < 0 && !isFlowRunning && (
-                <p className="text-center text-gray-500 text-sm mt-4">No active workflow. Click "Trigger Flow Now" or "Process 5 Clips" to start.</p>
-              )}
-            </div>
+            )}
 
             {/* Live Logs */}
             <div className="bg-white rounded-xl p-6 shadow-md border border-blue-100">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Live Activity Log</h3>
                 <button
-                  onClick={() => setLogs([])}
+                  onClick={async () => {
+                    try {
+                      await axios.get(`${backendUrl}/api/logs?clear=true`)
+                      setLogs([])
+                    } catch (error) {
+                      console.error('Error clearing logs:', error)
+                    }
+                  }}
                   className="text-xs text-gray-500 hover:text-gray-700"
                 >
                   Clear Logs
@@ -835,11 +844,7 @@ const GrooveSznDashboard = () => {
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-800">{step.label}</h3>
                       <p className="text-sm text-gray-500">
-                        {idx === 0 && 'Searching YouTube for viral content...'}
-                        {idx === 1 && 'Clipping 5 short highlights...'}
-                        {idx === 2 && 'Transcribing and generating captions...'}
-                        {idx === 3 && 'Uploading to TikTok and YouTube Shorts...'}
-                        {idx === 4 && 'Posting completed successfully!'}
+                        {flowStep === idx && isFlowRunning ? 'In progress...' : idx <= flowStep && flowStep >= 0 ? 'Completed' : 'Waiting...'}
                       </p>
                     </div>
                     {idx === flowStep && flowStep >= 0 && (
@@ -863,7 +868,14 @@ const GrooveSznDashboard = () => {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Real-Time Notifications</h3>
                 <button
-                  onClick={() => setLogs([])}
+                  onClick={async () => {
+                    try {
+                      await axios.get(`${backendUrl}/api/logs?clear=true`)
+                      setLogs([])
+                    } catch (error) {
+                      console.error('Error clearing logs:', error)
+                    }
+                  }}
                   className="text-xs text-gray-500 hover:text-gray-700"
                 >
                   Clear
