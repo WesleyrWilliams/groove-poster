@@ -173,7 +173,7 @@ export async function process5ClipsFromVideo(videoUrl, options = {}) {
       
       for (let i = 0; i < processedClips.length; i++) {
         const clip = processedClips[i];
-        addLog(`📤 Uploading clip ${clipNumber}/${processedClips.length} to YouTube...`, 'upload', workflowId);
+        addLog(`📤 Uploading clip ${clip.clipNumber}/${processedClips.length} to YouTube...`, 'upload', workflowId);
         console.log(`   Title: ${clip.title}`);
         console.log(`   Path: ${clip.videoPath}\n`);
         
