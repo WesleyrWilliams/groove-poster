@@ -672,7 +672,6 @@ const GrooveSznDashboard = () => {
                 <button
                   onClick={() => {
                     setAutomationActive(!automationActive)
-                    addLog(`Automation ${!automationActive ? 'enabled' : 'disabled'}`, 'processing')
                   }}
                   className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors ${
                     automationActive ? 'bg-blue-600' : 'bg-gray-300'
