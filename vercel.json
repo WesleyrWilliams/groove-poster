@@ -11,6 +11,12 @@
       "src": "/(.*)",
       "dest": "api/index.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/internal/ping-hf",
+      "schedule": "*/3 * * * *"
+    }
   ]
 }
 

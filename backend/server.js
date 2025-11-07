@@ -4,8 +4,8 @@ import dotenv from 'dotenv';
 import { processVideoWithFreeTools, processChannelAutomatically } from './src/new-workflow.js';
 import { logRefreshToken } from './src/oauth-tokens.js';
 import { runTrendingWorkflow } from './src/trending-workflow.js';
-import startWhisperPinger from './utils/pingWhisper.js';
-import startTtsPinger from './utils/pingTTS.js';
+import startWhisperPinger, { pingWhisper } from './utils/pingWhisper.js';
+import startTtsPinger, { pingTts } from './utils/pingTTS.js';
 
 dotenv.config();
 
@@ -19,6 +19,29 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Internal endpoint to force ping the Hugging Face Spaces (used by scheduled jobs)
+app.get('/internal/ping-hf', async (req, res) => {
+  try {
+    const [whisper, tts] = await Promise.all([
+      pingWhisper({ source: 'http' }),
+      pingTts({ source: 'http' })
+    ]);
+
+    res.json({
+      ok: true,
+      timestamp: new Date().toISOString(),
+      whisper,
+      tts
+    });
+  } catch (error) {
+    console.error('❌ Failed to ping Hugging Face Spaces:', error);
+    res.status(500).json({
+      ok: false,
+      error: error.message || 'Failed to ping Spaces'
+    });
+  }
+});
 
 // Health check
 app.get('/', (req, res) => {

@@ -4,8 +4,9 @@
 import axios from 'axios';
 
 const TTS_URL = "https://wes22-linely-tts.hf.space";
+const INTERVAL_MS = 3 * 60 * 1000;
 
-async function pingTts() {
+export async function pingTts({ source = 'interval', log = true } = {}) {
   const random = Math.floor(Math.random() * 10000);
   const urls = [
     `${TTS_URL}?ping=${random}`,
@@ -17,33 +18,53 @@ async function pingTts() {
     try {
       const response = await axios.get(url, {
         timeout: 15000,
-        validateStatus: (status) => status < 500,
+        validateStatus: () => true,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; GrooveSzn/1.0)'
         }
       });
 
-      if (response.status < 500) {
-        console.log("✅ TTS Space pinged successfully:", new Date().toLocaleTimeString());
-        return;
+      if (response.status < 600) {
+        if (log) {
+          console.log(`✅ TTS Space pinged successfully [${source}] (status ${response.status}):`, new Date().toLocaleTimeString());
+        }
+        return { ok: true, status: response.status, url };
       }
     } catch (err) {
-      if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
-        continue;
-      } else if (err.response?.status === 405 || err.response?.status === 404) {
-        console.log("✅ TTS Space is awake (endpoint not found, but Space is responding):", new Date().toLocaleTimeString());
-        return;
+      const status = err.response?.status;
+      if (status === 405 || status === 404) {
+        if (log) {
+          console.log(`✅ TTS Space is awake (endpoint ${status}) [${source}]:`, new Date().toLocaleTimeString());
+        }
+        return { ok: true, status, url };
       }
-      continue;
+
+      const reason = err.code || err.message || 'unknown-error';
+      if (log) {
+        console.warn(`⚠️ TTS Space ping error [${source}] (${reason}) for ${url}`);
+      }
     }
   }
 
-  console.log("⚠️ TTS Space ping timeout (Space may be sleeping, will retry in 3 min):", new Date().toLocaleTimeString());
+  if (log) {
+    console.warn(`⚠️ TTS Space ping timeout [${source}] - will retry in ${INTERVAL_MS / 60000} min:`, new Date().toLocaleTimeString());
+  }
+  return { ok: false, error: 'timeout' };
 }
 
 export default function startTtsPinger() {
-  pingTts();
-  setInterval(pingTts, 3 * 60 * 1000);
+  if (globalThis.__ttsPinger) {
+    return;
+  }
+
+  const tick = () => pingTts().catch((err) => {
+    console.error('❌ Unhandled TTS ping error:', err);
+  });
+
+  tick();
+  const interval = setInterval(tick, INTERVAL_MS);
+  globalThis.__ttsPinger = interval;
+
   console.log("🔄 TTS Space pinger started (pinging every 3 minutes to prevent sleeping)");
 }
 
